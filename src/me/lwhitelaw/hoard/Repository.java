@@ -124,10 +124,8 @@ public class Repository implements Closeable {
 			int bytesRead = readFully(blocksFile, header);
 			header.flip(); // "filling" -> "draining"; mostly a formality because of absolute addressing
 			if (bytesRead < 8) {
-				System.out.println("not enough data here");
 				return; // not enough data to determine the magic
 			} else if (bytesRead >= 8 && header.getLong(0) == FSYNC_END) {
-				System.out.println("fsync marker");
 				// it's an fsync marker
 				// flush the blocks list and add them to index
 				for (BlockLocation blk : blocksBeforeSync) {
@@ -139,7 +137,6 @@ public class Repository implements Closeable {
 				// jump 8 bytes
 				blocksFile.position(startPosition + 8);
 			} else if (bytesRead == 48 && header.getLong(0) == HEADER_MAGIC) {
-				System.out.println("blockhdr");
 				// it's a BLOCKHDR header
 				// grab the hash
 				byte[] hash = new byte[32];
@@ -150,26 +147,20 @@ public class Repository implements Closeable {
 				int encodedLength = header.getShort(HEADER_OFFS_ELENGTH) & 0xFFFF;
 				// check that lengths are sensible
 				if (length < encodedLength) {
-					System.out.println("bad elength!");
 					return; // lengths are not sensible
 				}
 				// check that the encoding is known: if so, index it
 				// an unknown encoding is not an error, but does result in block being skipped
 				if (encoding == RAW_ENCODING || encoding == ZLIB_ENCODING) {
-					System.out.println("known encoding");
 					// verify payloads, if set
 					// TODO: write code for above
 					BlockLocation block = new BlockLocation(hash, startPosition + HEADER_OFFS_PAYLOAD, encoding, (short) length, (short) encodedLength);
 					blocksBeforeSync.add(block);
-					System.out.println(block);
-				} else {
-					System.out.println("encoding not known");
 				}
 				// advance past the header and payload
 				blocksFile.position(startPosition + HEADER_SIZE + encodedLength);
 			} else {
 				// data here isn't known
-				System.out.println("unknown data");
 				return;
 			}
 		}
@@ -235,7 +226,7 @@ public class Repository implements Closeable {
 			BlockLocation location = index.get(hash);
 			if (location == null) return null; // no data present for this hash
 			// allocate space for encoded payload and read it
-			ByteBuffer encodedPayload = ByteBuffer.allocate(location.blockEncodedLength() & 0xFFFF);
+			ByteBuffer encodedPayload = ByteBuffer.allocate(location.blockEncodedLength() & 0xFFFF).order(ByteOrder.BIG_ENDIAN);
 			blocksFile.position(location.blockFileLocation());
 			readFully(blocksFile, encodedPayload);
 			encodedPayload.flip(); // "filling" -> "draining"
@@ -244,7 +235,7 @@ public class Repository implements Closeable {
 				return encodedPayload;
 			} else if (location.blockEncoding() == ZLIB_ENCODING) {
 				// if zlib encoded, needs a new buffer to hold decompressed data
-				ByteBuffer decodedPayload = ByteBuffer.allocate(location.blockLength() & 0xFFFF);
+				ByteBuffer decodedPayload = ByteBuffer.allocate(location.blockLength() & 0xFFFF).order(ByteOrder.BIG_ENDIAN);
 				try {
 					decompress(encodedPayload, decodedPayload);
 				} catch (DataFormatException ex) {
