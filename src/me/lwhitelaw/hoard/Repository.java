@@ -255,10 +255,11 @@ public class Repository implements Closeable {
 	
 	/**
 	 * Read a block from the repository for the provided hash, returning null if the data is not present or could not be presented.
-	 * If reading fails, RepositoryException is thrown; the repository may be closed in some cases.
+	 * If reading fails, RepositoryException or a subclass is thrown; the repository may be closed in some cases.
 	 * @param hash The hash for which to request data
 	 * @return the data, or null if not available
 	 * @throws RepositoryException if there are problems reading the requested data
+	 * @throws RecoverableRepositoryException if there are problems, but the repository can still be used
 	 */
 	public ByteBuffer readBlock(byte[] hash) {
 		checkOpen();
@@ -281,13 +282,13 @@ public class Repository implements Closeable {
 					decompress(encodedPayload, decodedPayload);
 				} catch (DataFormatException ex) {
 					// data was malformed! treat it as an error
-					throw new RepositoryException("zlib decompression problem for block " + hashToString(hash), ex);
+					throw new RecoverableRepositoryException("zlib decompression problem for block " + hashToString(hash), ex);
 				}
 				decodedPayload.flip();
 				return decodedPayload;
 			} else {
 				// format isn't known, so treat it as an error
-				throw new RepositoryException("Unknown encoding " + Integer.toHexString(location.blockEncoding()) + " for block " + hashToString(hash), null);
+				throw new RecoverableRepositoryException("Unknown encoding " + Integer.toHexString(location.blockEncoding()) + " for block " + hashToString(hash), null);
 			}
 		} catch (IOException ex) {
 			closeFile();
