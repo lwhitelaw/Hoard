@@ -8,7 +8,6 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -20,6 +19,10 @@ import java.util.zip.Inflater;
 
 import static java.nio.file.StandardOpenOption.*;
 
+/**
+ * A repository for content-addressed blocks of data, permitting reads and writes.
+ *
+ */
 public class Repository implements Closeable {
 	private static final int HEADER_SIZE = 48; // size of the header in bytes
 	// Offsets into the header
@@ -40,8 +43,17 @@ public class Repository implements Closeable {
 	private final FileChannel blocksFile; // the file where blocks are stored
 	private final boolean readOnly; // if true, writing not possible
 	private long lastFsyncEndOffset; // file offset where last fsync mark was written; data after is ignored and new writes start here
-	// TODO: writes always add to end even with corrupted data
 	
+	/**
+	 * Access a block repository on the specified file. If <code>writable</code> is <code>true</code>, the repository
+	 * will be opened for writing, and the file created if needed. Otherwise, the repository is read-only. If the file
+	 * has corrupted data and the repository is opened for writing, the corrupted data will be truncated up to the last
+	 * safe point.
+	 * @param path file path to the repository file
+	 * @param writable true if writing should be allowed
+	 * @throws IOException if an error occurs when opening the repository.
+	 * @throws RepositoryException if SHA3-256 is not supported by the JDK in use
+	 */
 	public Repository(Path path, boolean writable) throws IOException {
 		try {
 			MessageDigest.getInstance("SHA3-256"); // should throw if not present
@@ -66,6 +78,10 @@ public class Repository implements Closeable {
 		}
 	}
 
+	/**
+	 * Close the repository. If the repository is writable,
+	 * written data will be committed to non-volatile storage if needed.
+	 */
 	@Override
 	public void close() {
 		lock.lock();
@@ -82,6 +98,10 @@ public class Repository implements Closeable {
 		}
 	}
 	
+	/**
+	 * Commit any written data to non-volatile storage. Upon completion
+	 * any blocks previously written are guaranteed to be committed to disk.
+	 */
 	public void sync() {
 		checkOpenAndWritable();
 		lock.lock();
@@ -110,6 +130,11 @@ public class Repository implements Closeable {
 		}
 	}
 	
+	/**
+	 * Initialise the index by reading the file's headers, optionally verifying payloads have their expected hashes.
+	 * @param verifyPayloads if true, verify payloads have the hashes they should have
+	 * @throws IOException if an IO error occurs
+	 */
 	private void initIndex(boolean verifyPayloads) throws IOException {
 		// List of pending block locations before a fsync marker is seen
 		List<BlockLocation> blocksBeforeSync = new ArrayList<>();
@@ -166,6 +191,13 @@ public class Repository implements Closeable {
 		}
 	}
 	
+	/**
+	 * Write a block to the repository and return the hash that can be used to read the data later. The data can be at most 65535 bytes
+	 * in size. If writing fails, the repository is closed and RepositoryException is thrown.
+	 * @param data the data to write
+	 * @return the hash of the data
+	 * @throws RepositoryException if writing fails
+	 */
 	public byte[] writeBlock(ByteBuffer data) {
 		checkOpenAndWritable();
 		int sourcelength = data.remaining();
@@ -219,6 +251,13 @@ public class Repository implements Closeable {
 		}
 	}
 	
+	/**
+	 * Read a block from the repository for the provided hash, returning null if the data is not present or could not be presented.
+	 * If reading fails, RepositoryException is thrown; the repository may be closed in some cases.
+	 * @param hash The hash for which to request data
+	 * @return the data, or null if not available
+	 * @throws RepositoryException if there are problems reading the requested data
+	 */
 	public ByteBuffer readBlock(byte[] hash) {
 		checkOpen();
 		lock.lock();
@@ -256,6 +295,11 @@ public class Repository implements Closeable {
 		}
 	}
 	
+	/**
+	 * Return the SHA3-256 hash of the data.
+	 * @param data data to hash
+	 * @return SHA3-256 hash of the data
+	 */
 	public static byte[] hash(ByteBuffer data) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA3-256");
@@ -266,6 +310,14 @@ public class Repository implements Closeable {
 		}
 	}
 	
+	/**
+	 * Push header data into the output buffer
+	 * @param output output buffer to fill
+	 * @param hash hash value
+	 * @param encoding block encoding
+	 * @param length raw/decompressed length of the payload
+	 * @param elength compressed length of the payload
+	 */
 	private static void makeHeader(ByteBuffer output, byte[] hash, int encoding, short length, short elength) {
 		output.order(ByteOrder.BIG_ENDIAN).putLong(HEADER_MAGIC)
 			.put(hash)
@@ -276,6 +328,12 @@ public class Repository implements Closeable {
 	
 	private static final String HEX_DIGITS = "0123456789ABCDEF";
 	
+	/**
+	 * Convert a hex character to a number.
+	 * @param h character to convert
+	 * @return value of this character
+	 * @throws IllegalArgumentException if the character is not a valid hex digit
+	 */
 	private static int hexCharToInt(char h) {
 		switch (h) {
 			case '0': return 0x0;
@@ -298,6 +356,11 @@ public class Repository implements Closeable {
 		throw new IllegalArgumentException("not a digit");
 	}
 	
+	/**
+	 * Convert a byte-array hash to a string representation.
+	 * @param hash hash to convert
+	 * @return the hash as a string
+	 */
 	public static String hashToString(byte[] hash) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < hash.length; i++) {
@@ -308,6 +371,12 @@ public class Repository implements Closeable {
 		return sb.toString();
 	}
 	
+	/**
+	 * Convert a string hash to a byte-array representation
+	 * @param hash string to convert
+	 * @return the hash as a byte array
+	 * @throws IllegalArgumentException if the string is not of appropriate length
+	 */
 	public static byte[] stringToHash(String hash) {
 		if (hash.length() % 2 != 0) throw new IllegalArgumentException("hash string not a multiple of 2");
 		byte[] out = new byte[hash.length() / 2];
@@ -417,6 +486,9 @@ public class Repository implements Closeable {
 		return true;
 	}
 	
+	/**
+	 * Close the block file, wrapping and rethrowing IOException.
+	 */
 	private void closeFile() {
 		try {
 			blocksFile.close();
@@ -425,12 +497,18 @@ public class Repository implements Closeable {
 		}
 	}
 	
+	/**
+	 * Throw IllegalStateException if the block file is not open.
+	 */
 	private void checkOpen() {
 		if (!blocksFile.isOpen()) {
 			throw new IllegalStateException("Repository is closed!");
 		}
 	}
 	
+	/**
+	 * Throw IllegalStateException if the block file is not open or not writable.
+	 */
 	private void checkOpenAndWritable() {
 		checkOpen();
 		if (readOnly) {
@@ -447,6 +525,6 @@ Block format
 	40 byte encoding[4];  // compression mode: '\0\0\0\0' (uncompressed),'ZLIB' (zlib)
 	44 ushort length;     // unsigned 16-bit raw length of the data following
 	46 ushort elength;    // unsigned 16-bit encoded length of the data following
-	48 byte data[length]; // The payload data
+	48 byte data[elength]; // The payload data
 }
 */
