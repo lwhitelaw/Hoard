@@ -88,8 +88,8 @@ public class Repository implements Closeable {
 		try {
 			// Only if the file is open...
 			if (blocksFile.isOpen()) {
-				// Sync so the marker is written out
-				sync();
+				// Sync so the marker is written out, if the file is writable
+				if (!readOnly) sync();
 				// Close file
 				closeFile();
 			}
@@ -197,10 +197,12 @@ public class Repository implements Closeable {
 	 * @param data the data to write
 	 * @return the hash of the data
 	 * @throws RepositoryException if writing fails
+	 * @throws IllegalArgumentException if the data to be written is larger than 65535 bytes
 	 */
 	public byte[] writeBlock(ByteBuffer data) {
 		checkOpenAndWritable();
 		int sourcelength = data.remaining();
+		if (sourcelength > 65535) throw new IllegalArgumentException("Data length of " + sourcelength + " is longer than the maximum of 65535 bytes");
 		// hash data
 		byte[] hash = hash(data);
 		lock.lock();
