@@ -1,6 +1,5 @@
 package me.lwhitelaw.hoard;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -24,8 +23,9 @@ import static java.nio.file.StandardOpenOption.*;
  * referenced by an in-memory index built on creation. Blocks are compressed with ZLIB if doing so is advantageous.
  * Data is kept consistent using "fsync markers" indicating where valid data ends in case of a crash or power loss.
  * Instances of this class are safe for use by multiple threads, however, operations do not proceed concurrently.
+ * This repository uses SHA3-256 hashes.
  */
-public class FileRepository implements Closeable {
+public class FileRepository implements Repository {
 	/*
 	Block format
 	{
