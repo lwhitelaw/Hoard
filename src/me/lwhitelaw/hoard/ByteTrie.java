@@ -2,6 +2,11 @@ package me.lwhitelaw.hoard;
 
 import java.util.Objects;
 
+/**
+ * A sparse trie keyed on byte arrays using a left-child-right-sibling/Knuth transformed binary tree.
+ * Null values are treated as empty nodes. Null keys are not permitted.
+ * @param <V> type of the value
+ */
 public class ByteTrie<V> {
 	private static class Node<V> {
 		private byte keyElement; // not used for empty string; indicates byte value from the key associated with node
@@ -12,8 +17,16 @@ public class ByteTrie<V> {
 	
 	private Node<V> root = null; // root of the trie, either null or starts with node for empty string
 	
+	/**
+	 * Construct an empty trie.
+	 */
 	public ByteTrie() {}
 	
+	/**
+	 * Return the value associated with this key, or null if no value present.
+	 * @param key the key to access
+	 * @return the associated value, or null
+	 */
 	public V get(byte[] key) {
 		Objects.requireNonNull(key);
 		Node<V> currNode = root;
@@ -38,6 +51,11 @@ public class ByteTrie<V> {
 		return currNode.value;
 	}
 	
+	/**
+	 * Return true if there is a value associated with this key.
+	 * @param key the key to access
+	 * @return true if a value is associated
+	 */
 	public boolean containsKey(byte[] key) {
 		Objects.requireNonNull(key);
 		Node<V> currNode = root;
@@ -62,6 +80,11 @@ public class ByteTrie<V> {
 		return currNode.value != null;
 	}
 	
+	/**
+	 * Insert a value for the provided key.
+	 * @param key the key
+	 * @param value the value for this key
+	 */
 	public void put(byte[] key, V value) {
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(value);
@@ -98,6 +121,10 @@ public class ByteTrie<V> {
 		currNode.value = value;
 	}
 	
+	/**
+	 * Remove the mapping for this key.
+	 * @param key the key to remove.
+	 */
 	public void remove(byte[] key) {
 		Objects.requireNonNull(key);
 		Node<V> currNode = root;
@@ -125,8 +152,12 @@ public class ByteTrie<V> {
 		cleanDescendents(currNode);
 	}
 	
-	// returns true if the node is "dead", not having a value or any children
-	// attempts to remove dead child/next and returns false otherwise
+	/**
+	 * Returns true if the node is "dead", not having a value or any children.
+	 * Attempts to remove dead child/next and returns false otherwise.
+	 * @param node node to clean descendents from
+	 * @return true on dead node, false if node is essential
+	 */
 	private boolean cleanDescendents(Node<V> node) {
 		// If child is dead, remove it, then drop it's reference
 		if (node.child != null && cleanDescendents(node.child)) {
@@ -145,6 +176,9 @@ public class ByteTrie<V> {
 		return false;
 	}
 	
+	/**
+	 * Clean any unnecessary nodes from the internal structure of the trie.
+	 */
 	public void gc() {
 		if (root != null && cleanDescendents(root)) {
 			root = null;
