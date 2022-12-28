@@ -20,10 +20,40 @@ import java.util.zip.Inflater;
 import static java.nio.file.StandardOpenOption.*;
 
 /**
- * A repository for content-addressed blocks of data, permitting reads and writes.
- *
+ * A file-based repository for content-addressed blocks of data. All blocks are stored in an append-only file
+ * referenced by an in-memory index built on creation. Blocks are compressed with ZLIB if doing so is advantageous.
+ * Data is kept consistent using "fsync markers" indicating where valid data ends in case of a crash or power loss.
+ * Instances of this class are safe for use by multiple threads, however, operations do not proceed concurrently.
  */
-public class Repository implements Closeable {
+public class FileRepository implements Closeable {
+	/*
+	Block format
+	{
+		0 "BLOCKHDR"           // Magic number (8 bytes)
+		8 byte hash[32];       // 256-bit SHA3-256 hash of the block to follow
+		40 byte encoding[4];   // compression mode: "\0\0\0\0" (uncompressed),"ZLIB" (zlib)
+		                       //   other values may be present in later versions
+		                       //   encodings that are not understood by the implementation are to be treated as if they were
+		                       //   not present.
+		44 ushort length;      // unsigned 16-bit raw length of the data following
+		46 ushort elength;     // unsigned 16-bit encoded length of the data following
+		48 byte data[elength]; // The payload data
+	}
+	fsync marker
+	{
+		0 "FSYNCEND"           // Magic number (8 bytes)
+	}
+	
+	A block file consists simply of concatenating any number of the above structures in combination, as long as the file
+	ends with an fsync marker. If a crash occurs and the fsync marker is not written to finalise any writes, upon
+	the next open, any data after the last fsync marker in the file is ignored and will be truncated if possible to enforce
+	consistency.
+	
+	Other implementations should at least support raw and ZLIB encoding; otherwise blocks in unknown encodings should
+	not be indexed and treated as if the block was not present in the file, even if it means the block will be written more
+	than once in the file using multiple encodings.
+	*/
+	
 	private static final int HEADER_SIZE = 48; // size of the header in bytes
 	// Offsets into the header
 	private static final int HEADER_OFFS_MAGIC = 0; // Magic value (should be HEADER_MAGIC)
@@ -48,13 +78,12 @@ public class Repository implements Closeable {
 	 * Access a block repository on the specified file. If <code>writable</code> is <code>true</code>, the repository
 	 * will be opened for writing, and the file created if needed. Otherwise, the repository is read-only. If the file
 	 * has corrupted data and the repository is opened for writing, the corrupted data will be truncated up to the last
-	 * safe point.
+	 * fsync marker.
 	 * @param path file path to the repository file
 	 * @param writable true if writing should be allowed
-	 * @throws IOException if an error occurs when opening the repository.
-	 * @throws RepositoryException if SHA3-256 is not supported by the JDK in use
+	 * @throws RepositoryException if SHA3-256 is not supported by the JDK in use, or if an error occurs when opening the repository.
 	 */
-	public Repository(Path path, boolean writable) throws IOException {
+	public FileRepository(Path path, boolean writable) {
 		try {
 			MessageDigest.getInstance("SHA3-256"); // should throw if not present
 		} catch (NoSuchAlgorithmException ex) {
@@ -64,23 +93,28 @@ public class Repository implements Closeable {
 		index = new ByteTrie<>();
 		readOnly = !writable;
 		// check writable and open file depending on mode
-		if (writable) {
-			blocksFile = FileChannel.open(path,CREATE,READ,WRITE);
-		} else {
-			blocksFile = FileChannel.open(path,READ);
-		}
-		// parse blocks and build the index
-		initIndex(false);
-		// if we are writable, truncate the file after the last fsync marker
-		if (!readOnly) {
-			blocksFile.truncate(lastFsyncEndOffset);
-			blocksFile.force(false);
+		try {
+			if (writable) {
+				blocksFile = FileChannel.open(path,CREATE,READ,WRITE);
+			} else {
+				blocksFile = FileChannel.open(path,READ);
+			}
+			// parse blocks and build the index
+			initIndex(false);
+			// if we are writable, truncate the file after the last fsync marker
+			if (!readOnly) {
+				blocksFile.truncate(lastFsyncEndOffset);
+				blocksFile.force(false);
+			}
+		} catch (IOException ex) {
+			throw new RepositoryException("Failed to open repository", ex);
 		}
 	}
 
 	/**
 	 * Close the repository. If the repository is writable,
 	 * written data will be committed to non-volatile storage if needed.
+	 * @throws RepositoryException if closing fails
 	 */
 	@Override
 	public void close() {
@@ -99,8 +133,9 @@ public class Repository implements Closeable {
 	}
 	
 	/**
-	 * Commit any written data to non-volatile storage. Upon completion
-	 * any blocks previously written are guaranteed to be committed to disk.
+	 * Ensure any written data is persisted to non-volatile storage. This method blocks until
+	 * that is done. An "fsync marker" is written, then fsync is called to persist writes to disk.
+	 * @throws RepositoryException if persistence fails
 	 */
 	public void sync() {
 		checkOpenAndWritable();
@@ -193,11 +228,13 @@ public class Repository implements Closeable {
 	
 	/**
 	 * Write a block to the repository and return the hash that can be used to read the data later. The data can be at most 65535 bytes
-	 * in size. If writing fails, the repository is closed and RepositoryException is thrown.
+	 * in size. If writing fails, the repository is closed and RepositoryException is thrown. Note that even if this method successfully
+	 * returns, data may not be persisted until a later time.
 	 * @param data the data to write
 	 * @return the hash of the data
 	 * @throws RepositoryException if writing fails
 	 * @throws IllegalArgumentException if the data to be written is larger than 65535 bytes
+	 * @throws IllegalStateException if the repository is not open or read-only
 	 */
 	public byte[] writeBlock(ByteBuffer data) {
 		checkOpenAndWritable();
@@ -519,15 +556,3 @@ public class Repository implements Closeable {
 		}
 	}
 }
-
-/*
-Block format
-{
-	0 "BLOCKHDR"         // Magic number (8 bytes)
-	8 byte hash[32];     // 256-bit hash of the block to follow
-	40 byte encoding[4];  // compression mode: '\0\0\0\0' (uncompressed),'ZLIB' (zlib)
-	44 ushort length;     // unsigned 16-bit raw length of the data following
-	46 ushort elength;    // unsigned 16-bit encoded length of the data following
-	48 byte data[elength]; // The payload data
-}
-*/
