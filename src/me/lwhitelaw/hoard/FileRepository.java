@@ -319,17 +319,17 @@ public class FileRepository implements Repository {
 					decompress(encodedPayload, decodedPayload);
 				} catch (DataFormatException ex) {
 					// data was malformed! treat it as an error
-					throw new RecoverableRepositoryException("zlib decompression problem for block " + hashToString(hash), ex);
+					throw new RecoverableRepositoryException("zlib decompression problem for block " + Hashes.hashToString(hash), ex);
 				}
 				decodedPayload.flip();
 				return decodedPayload;
 			} else {
 				// format isn't known, so treat it as an error
-				throw new RecoverableRepositoryException("Unknown encoding " + Integer.toHexString(location.blockEncoding()) + " for block " + hashToString(hash), null);
+				throw new RecoverableRepositoryException("Unknown encoding " + Integer.toHexString(location.blockEncoding()) + " for block " + Hashes.hashToString(hash), null);
 			}
 		} catch (IOException ex) {
 			closeFile();
-			throw new RepositoryException("Problem while reading block " + hashToString(hash),ex);
+			throw new RepositoryException("Problem while reading block " + Hashes.hashToString(hash),ex);
 		} finally {
 			lock.unlock();
 		}
