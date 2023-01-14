@@ -13,6 +13,12 @@ import java.nio.ByteBuffer;
  */
 public interface Repository extends Closeable {
 	/**
+	 * Return the size of the hash in bytes this repository expects to receive. This value is fixed at the time
+	 * of repository creation and will not change. Consumers may use this value to size pointers in their data structures.
+	 * @return the hash size in bytes
+	 */
+	int hashSize();
+	/**
 	 * Write a block to the repository and return a hash that uniquely identifies the written data and can be used to read the data later.
 	 * The data can be at most 65535 bytes in size. If writing fails, RepositoryException or a subclass is thrown; the repository may
 	 * be closed depending on the implementation. Note that even if this method successfully returns, data may not be persisted until a later time.

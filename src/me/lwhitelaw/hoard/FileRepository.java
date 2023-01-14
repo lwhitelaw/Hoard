@@ -110,6 +110,14 @@ public class FileRepository implements Repository {
 			throw new RepositoryException("Failed to open repository", ex);
 		}
 	}
+	
+	/**
+	 * Returns 32, the size in bytes of a SHA3-256 hash.
+	 */
+	@Override
+	public int hashSize() {
+		return 32;
+	}
 
 	/**
 	 * Close the repository. If the repository is writable,
