@@ -4,17 +4,18 @@ import java.io.Closeable;
 import java.nio.ByteBuffer;
 
 /**
- * A repository for the storage of data blocks, addressed by the virtually unique, fixed-size hash of their contents.
+ * A repository for the storage of data blocks, addressed by the virtually unique, fixed-size SHA3-256 hash of their contents.
  * Data blocks may have any length from zero to 65535 bytes. A repository may be writable or read-only; a read-only
- * repository will throw an exception if one attempts to write or sync data. There is no specification on what hash any
- * given implementation accepts, so hashes may not be portable between different repository implementations; however, the
- * use of SHA3-256 as the hashing function is recommended. Implementations should document which hashing implementation they use.
+ * repository will throw an exception if one attempts to write or sync data. Clients should expect repository
+ * implementations to use SHA3-256, likewise all utility classes in this package assume a 256-bit hash is used.
+ * Implementations that use a different hash function should document which function is in use.
  *
  */
 public interface Repository extends Closeable {
 	/**
 	 * Return the size of the hash in bytes this repository expects to receive. This value is fixed at the time
 	 * of repository creation and will not change. Consumers may use this value to size pointers in their data structures.
+	 * For implementations that use SHA3-256, this will be 32.
 	 * @return the hash size in bytes
 	 */
 	int hashSize();
