@@ -16,7 +16,7 @@ import me.lwhitelaw.hoard.Repository;
  * B-tree of pointer superblocks. Each data block is formed from chunking the stream using a moving sum creating variable-sized
  * blocks ranging from 4096 to 65535 bytes. Superblocks contain at most 1024 pointers to subblocks.
  * 
- * A superblock tree emitted by this class can store an unlimited amount of data, provided the underlying repository
+ * A superblock tree emitted by this class can store any amount of data up to the tree depth limit of 24, provided the underlying repository
  * is capable of storing all of the blocks required to represent it.
  * 
  * Upon closure of the stream, the hash to the superblock tree can be obtained.
@@ -25,14 +25,15 @@ public class SuperblockOutputStream extends OutputStream {
 	// leaf blocks go to level 0
 	// once level 0 has 1024 blocks, all block hashes are compiled into a pointer block and put in level 1
 	// level 0 is then cleared; same process repeats for level 1, 2, etc...
-	// once stream is finished, lower levels have their blocks combined into upper levels repeatedly until one block remains
-	//   even if this produces a pointer block pointing to only one leaf/pointer block from the lower level
+	// once stream is finished, lower levels have their blocks combined into upper levels
+	// until reaching the top
 	
 	private final Repository repo; // the repository to which all blocks are written
 	private final ByteBuffer[] currentSuperblocks; // buffers for up to 24 levels of superblocks yet to be written
 	private final ByteBuffer currentBlock; // buffer for the current leaf block yet to be written
-	private int maxSuperblockUsed = 0; // Maximum level of superblocks ever requested during writing; used for determining where to stop promotion
 	private byte[] finalHash; // hash root of the superblock tree; null while the stream isn't closed
+	private boolean nonempty; // latches true if the stream has at least a byte of data written
+	private boolean treeFull; // latches true if the top level has 1024 blocks so no more data can be written without dropping it
 	
 	// Header
 	private static final int HEADER_SIZE = 12;
@@ -45,7 +46,8 @@ public class SuperblockOutputStream extends OutputStream {
 	// Magic values
 	private static final long HEADER_MAGIC = 0x5355504552424C4BL; // "SUPERBLK", magic for all superblocks
 	private static final int MAX_BLOCKS_PER_LEVEL = 1024; // max number of blocks in a superblock
-	private static final int MAX_LEVELS = 24; // Maximum levels the tree can stack to in this implementatione	epo
+	private static final int MAX_LEVELS = 24; // Maximum levels the tree can stack to in this implementation
+	private static final int TOP_LEVEL = MAX_LEVELS - 1; // the highest level in the tree; if this hits 1024 no more data can be accepted
 	/*
 	 * Each data block can hold 4096 to 65535 bytes, so 2^12 to 2^16-1 bytes.
 	 * Each superblock holds 1024 hashes, so 10 added to the exponent per superblock level.
@@ -56,18 +58,24 @@ public class SuperblockOutputStream extends OutputStream {
 	public SuperblockOutputStream(Repository repo) {
 		this.repo = repo;
 		currentBlock = ByteBuffer.allocate(65535);
-		currentSuperblocks = new ByteBuffer[24];
+		currentSuperblocks = new ByteBuffer[MAX_LEVELS];
+		nonempty = false;
+		treeFull = false;
 	}
 
 	@Override
-	public void write(int b) throws IOException {
+	public void write(int b) {
+		if (finalHash != null) throw new IllegalStateException("Stream closed");
+		if (treeFull) throw new RecoverableRepositoryException("No more data can be written to this stream without truncation", null);
 		currentBlock.put((byte) b);
 		if (!currentBlock.hasRemaining()) {
 			// full block, push it
 			pushBlock();
 		}
+		nonempty = true; // calling write at all by definition makes the stream not empty
 	}
 	
+	// Push the current data block into superblock level 0
 	private void pushBlock() {
 		// Write back data block
 		currentBlock.flip(); // to drain
@@ -81,10 +89,10 @@ public class SuperblockOutputStream extends OutputStream {
 	
 	// Handle promotions of full blocks once lower levels hit 1024
 	private void promoteFullBlocks() {
-		final int maxlevel = maxSuperblockUsed; // snapshot at the beginning to stop infinite looping
-		for (int level = 0; level <= maxlevel; level++) {
+		int level = 0;
+		while (level < TOP_LEVEL) {
 			ByteBuffer superblock = getBlockListForLevel(level);
-			if (getSuperblockNumBlocks(superblock) < 1024) return; // nothing to promote here
+			if (getSuperblockNumBlocks(superblock) < MAX_BLOCKS_PER_LEVEL) return; // nothing to promote here
 			// else promotion needed
 			// write the superblock
 			superblock.flip(); // to drain
@@ -93,32 +101,84 @@ public class SuperblockOutputStream extends OutputStream {
 			// reinitialise superblock just written
 			resetSuperblock(superblock, level);
 			// push hash into next superblock level
-			ByteBuffer upperSuperblock = getBlockListForLevel(level + 1); // note: raises maxSuperblockUsed
+			final int upperLevel = level + 1;
+			ByteBuffer upperSuperblock = getBlockListForLevel(upperLevel);
 			putHashInSuperblock(upperSuperblock, hash);
 			// if this push causes a full superblock, it'll be handled on the next loop
+			
+			// check if the superblock we just pushed into is the last superblock level
+			// if it is now full, we do not want to accept more data because it cannot be handled
+			if (upperLevel == TOP_LEVEL && getSuperblockNumBlocks(upperSuperblock) == MAX_BLOCKS_PER_LEVEL) treeFull = true;
+			level++;
 		}
 	}
 	
 	// Consolidate blocks remaining on all levels into one hash
 	private void consolidateBlocks() {
-		final int maxlevel = maxSuperblockUsed; // snapshot at the beginning to stop infinite looping
-		for (int level = 0; level <= maxlevel; level++) {
-			ByteBuffer superblock = getBlockListForLevel(level);
-			if (getSuperblockNumBlocks(superblock) == 0) {
-				// an empty level does not need promotion
-				continue;
+		// if no data has been written, push an empty block forcibly, so level 0 has 1 block
+		if (!nonempty) pushBlock();
+		// walk the levels to determine what has blocks and what does not
+		int maxLevel = 0; // max level on which blocks are present
+		int numBlocks = 0; // total number of blocks present among all levels
+		for (int i = 0; i < MAX_LEVELS; i++) {
+			ByteBuffer superblock = currentSuperblocks[i];
+			if (superblock != null) {
+				int blocksInLevel = getSuperblockNumBlocks(superblock);
+				if (blocksInLevel > 0) maxLevel = i;
+				numBlocks += blocksInLevel;
 			}
-			// else promotion needed
-			// write the superblock
+		}
+		// now that data about the levels is known, there are four cases to handle.
+		// case 1: numBlocks == 1, maxLevel == 0: One block in the stream
+		//   - data blocks cannot exist alone, so coalesce into a level 1 block and write that
+		// case 2: numBlocks == 1, maxLevel > 0: One block at a higher level, no blocks below it
+		//   - take the hash of that one block and return that
+		// case 3: numBlocks > 1, maxLevel == 0: Multiple blocks at level 0
+		//   - coalesce upward and write
+		// case 4: numBlocks > 1, maxLevel > 0: Multiple blocks at multiple levels
+		//   - coalesce upward and write
+		
+		// handle cases 1 and 3
+		if (maxLevel == 0) {
+			ByteBuffer superblock = getBlockListForLevel(0);
 			superblock.flip(); // to drain
 			byte[] hash = repo.writeBlock(superblock);
 			superblock.clear();
-			// reinitialise
-			resetSuperblock(superblock, level);
-			// push hash into next superblock
-			ByteBuffer upperSuperblock = getBlockListForLevel(level + 1); // note: raises maxSuperblockUsed
-			putHashInSuperblock(upperSuperblock, hash);
-			// this should let blocks "bubble up"
+			finalHash = hash;
+		} else if (numBlocks == 1) {
+			// case 2
+			ByteBuffer superblock = getBlockListForLevel(maxLevel);
+			// extract the hash
+			// calculate the size of the hash based on the write position in the superblock
+			// minus the offset where the hash list should start... this should usually be 32 bytes
+			// we know only one hash exists so this should work
+			int hashSize = superblock.position() - HEADER_OFFS_HASHLIST;
+			byte[] hash = new byte[hashSize];
+			// copy from superblock
+			superblock.get(HEADER_OFFS_HASHLIST, hash);
+			finalHash = hash;
+		} else {
+			// case 4
+			// start at level 0, coalesce upward until we reach maxLevel
+			for (int level = 0; level < maxLevel; level++) {
+				// get superblock for current level
+				ByteBuffer superblock = getBlockListForLevel(level);
+				if (getSuperblockNumBlocks(superblock) == 0) continue; // no blocks to promote here
+				// otherwise write out block
+				superblock.flip(); // to drain
+				byte[] hash = repo.writeBlock(superblock);
+				superblock.clear();
+				// place hash in upper level
+				final int upperLevel = level + 1;
+				ByteBuffer upperSuperblock = getBlockListForLevel(upperLevel);
+				putHashInSuperblock(upperSuperblock, hash);
+			}
+			// now write out final superblock in maxLevel
+			ByteBuffer lastblock = getBlockListForLevel(maxLevel);
+			lastblock.flip(); // to drain
+			byte[] hash = repo.writeBlock(lastblock);
+			lastblock.clear();
+			finalHash = hash;
 		}
 	}
 	
@@ -131,12 +191,11 @@ public class SuperblockOutputStream extends OutputStream {
 			currentSuperblocks[level] = ByteBuffer.allocate(65535);
 			resetSuperblock(currentSuperblocks[level], level);
 		}
-		maxSuperblockUsed = Math.max(level, maxSuperblockUsed);
 		return currentSuperblocks[level];
 	}
 	
-	private void resetSuperblock(ByteBuffer superblock, int level) {
-		// Get or create buffer for given level, then make sure it is cleared
+	private static void resetSuperblock(ByteBuffer superblock, int level) {
+		// Make sure it is cleared
 		superblock.clear();
 		// Create header
 		superblock.putLong(HEADER_MAGIC);
@@ -147,13 +206,15 @@ public class SuperblockOutputStream extends OutputStream {
 	}
 	
 	private static void putHashInSuperblock(ByteBuffer superblock, byte[] hash) {
-		// Increment hash count (these are absolute so position shouldn't move)
+		int position = superblock.position();
+		// Increment hash count (these are absolute so position shouldn't move, save it just in case)
 		int count = getSuperblockNumBlocks(superblock);
 		if (count >= 1024) {
 			throw new AssertionError("exceeded hash limit of 1024");
 		}
 		setSuperblockNumBlocks(superblock, count + 1);
 		// now go back to end of buffer and write hash bytes
+		superblock.position(position);
 		superblock.put(hash);
 	}
 	
@@ -167,8 +228,12 @@ public class SuperblockOutputStream extends OutputStream {
 	
 	@Override
 	public void close() throws IOException {
-		// handle the final block
-		pushBlock();
+		// if the final hash has been assigned there is nothing to do
+		if (finalHash != null) return;
+		// push the current block if it has any data
+		if (currentBlock.position() > 0) pushBlock();
+		// consolidate blocks
+		consolidateBlocks();
 	}
 	
 	public byte[] getHash() {
