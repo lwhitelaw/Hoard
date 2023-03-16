@@ -21,6 +21,7 @@ import me.lwhitelaw.hoard.RecoverableRepositoryException;
 import me.lwhitelaw.hoard.Repository;
 import me.lwhitelaw.hoard.RepositoryException;
 import me.lwhitelaw.hoard.util.Chunker;
+import me.lwhitelaw.hoard.util.SuperblockOutputStream;
 
 public class Main {
 	public static void main(String[] args) throws IOException {
@@ -37,6 +38,15 @@ public class Main {
 				// check enough args to call
 				if (args.length == 3) {
 					write(args[1], args[2]);
+				} else {
+					help();
+				}
+				break;
+			case "writelong":
+				// block write
+				// check enough args to call
+				if (args.length == 3) {
+					writelong(args[1], args[2]);
 				} else {
 					help();
 				}
@@ -84,6 +94,49 @@ public class Main {
 				// Read file and write to repo
 				ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(blockpath));
 				byte[] hash = repo.writeBlock(buffer);
+				System.out.println(Hashes.hashToString(hash));
+			} catch (IOException ex) {
+				System.err.println("ERROR: I/O error");
+				exitcode = 255;
+			} catch (RepositoryException ex) {
+				System.err.println("ERROR: repository write failed");
+				exitcode = 255;
+			} finally {
+				try {
+					repo.close();
+				} catch (RepositoryException ex) {
+					System.err.println("ERROR: repository failed to close");
+					exitcode = 255;
+				}
+			}
+			System.exit(exitcode);
+			return;
+		} catch (Exception ex) {
+			System.err.println("ERROR: unknown exception thrown");
+			ex.printStackTrace();
+			System.exit(255);
+			return; // never happens but keeps javac happy
+		}
+	}
+	
+	private static void writelong(String repofile, String filename) {
+		try {
+			Path repopath = validatePath(repofile); // where repo will be stored
+			Path blockpath = validatePath(filename); // where to source the block data
+			validateFile(blockpath);
+			// Initialise repo
+			Repository repo = getRepository(repopath,true);
+			
+			int exitcode = 0;
+			try {
+				// Read file and write to repo
+				ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(blockpath));
+				SuperblockOutputStream sos = new SuperblockOutputStream(repo);
+				while (buffer.hasRemaining()) {
+					sos.write(buffer.get());
+				}
+				sos.close();
+				byte[] hash = sos.getHash();
 				System.out.println(Hashes.hashToString(hash));
 			} catch (IOException ex) {
 				System.err.println("ERROR: I/O error");
