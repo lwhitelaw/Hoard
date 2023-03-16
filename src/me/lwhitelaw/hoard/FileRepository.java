@@ -67,6 +67,8 @@ public class FileRepository implements Repository {
 	private static final long HEADER_MAGIC = 0x424C4F434B484452L; // "BLOCKHDR", start of a block
 	private static final int RAW_ENCODING = 0x00000000; // raw encoded payload
 	private static final int ZLIB_ENCODING = 0x5A4C4942; // "ZLIB", zlib encoded payload
+	// Debug
+	private static final boolean FORCE_RAW = false; // if true, never compress
 	
 	private final ReentrantLock lock; // operation lock
 	private final ByteTrie<BlockLocation> index; // index organising hashes to offsets in file that contain their blocks
@@ -262,6 +264,7 @@ public class FileRepository implements Repository {
 			ByteBuffer outData = ByteBuffer.allocate(65535).order(ByteOrder.BIG_ENDIAN); // max size
 			// might as well use best compression, since it'll only be compressed once
 			boolean zlibSuccess = compress(Deflater.BEST_COMPRESSION, data, outData);
+			if (FORCE_RAW) zlibSuccess = false;
 			if (!zlibSuccess) {
 				// compression failure, just recopy it without compression
 				outData.clear();
