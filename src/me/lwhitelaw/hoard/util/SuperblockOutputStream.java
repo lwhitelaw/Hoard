@@ -57,7 +57,7 @@ public class SuperblockOutputStream extends OutputStream {
 	
 	public SuperblockOutputStream(Repository repo) {
 		this.repo = repo;
-		currentBlock = ByteBuffer.allocate(65535);
+		currentBlock = ByteBuffer.allocate(65535).order(ByteOrder.BIG_ENDIAN);
 		currentSuperblocks = new ByteBuffer[MAX_LEVELS];
 		nonempty = false;
 		treeFull = false;
@@ -188,7 +188,7 @@ public class SuperblockOutputStream extends OutputStream {
 			throw new RecoverableRepositoryException("too many blocks", null);
 		}
 		if (currentSuperblocks[level] == null) {
-			currentSuperblocks[level] = ByteBuffer.allocate(65535);
+			currentSuperblocks[level] = ByteBuffer.allocate(65535).order(ByteOrder.BIG_ENDIAN);
 			resetSuperblock(currentSuperblocks[level], level);
 		}
 		return currentSuperblocks[level];
