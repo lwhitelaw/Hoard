@@ -21,6 +21,7 @@ import me.lwhitelaw.hoard.RecoverableRepositoryException;
 import me.lwhitelaw.hoard.Repository;
 import me.lwhitelaw.hoard.RepositoryException;
 import me.lwhitelaw.hoard.util.Chunker;
+import me.lwhitelaw.hoard.util.SuperblockInputStream;
 import me.lwhitelaw.hoard.util.SuperblockOutputStream;
 
 public class Main {
@@ -56,6 +57,15 @@ public class Main {
 				// check enough args to call
 				if (args.length == 3) {
 					read(args[1], args[2]);
+				} else {
+					help();
+				}
+				break;
+			case "readlong":
+				// block read
+				// check enough args to call
+				if (args.length == 3) {
+					readlong(args[1], args[2]);
 				} else {
 					help();
 				}
@@ -183,6 +193,44 @@ public class Main {
 					}
 					exitcode = 0;
 				}
+			} catch (RepositoryException ex) {
+				System.err.println("ERROR: repository read failed");
+				exitcode = 255;
+			} finally {
+				try {
+					repo.close();
+				} catch (RepositoryException ex) {
+					System.err.println("ERROR: repository failed to close");
+					exitcode = 255;
+				}
+			}
+			System.exit(exitcode);
+			return;
+		} catch (Exception ex) {
+			System.err.println("ERROR: unknown exception thrown");
+			ex.printStackTrace();
+			System.exit(255);
+			return; // never happens but keeps javac happy
+		}
+	}
+	
+	private static void readlong(String repofile, String hash) {
+		try {
+			Path repopath = validatePath(repofile); // where repo will be stored
+			byte[] hasharray = validateHash(hash);
+			// Initialise repo
+			Repository repo = getRepository(repopath,false);
+			
+			int exitcode = 0;
+			try {
+				// Read repo block and write to standard out
+				SuperblockInputStream sis = new SuperblockInputStream(repo, hasharray);
+				int c;
+				while ((c = sis.read()) != -1) {
+					System.out.write(c & 0xFF);
+				}
+				sis.close();
+				exitcode = 0;
 			} catch (RepositoryException ex) {
 				System.err.println("ERROR: repository read failed");
 				exitcode = 255;
