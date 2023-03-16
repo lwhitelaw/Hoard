@@ -191,6 +191,7 @@ public class Main {
 					while (buf.hasRemaining()) {
 						System.out.write(buf.get() & 0xFF);
 					}
+					System.out.flush();
 					exitcode = 0;
 				}
 			} catch (RepositoryException ex) {
@@ -229,6 +230,7 @@ public class Main {
 				while ((c = sis.read()) != -1) {
 					System.out.write(c & 0xFF);
 				}
+				System.out.flush();
 				sis.close();
 				exitcode = 0;
 			} catch (RepositoryException ex) {
