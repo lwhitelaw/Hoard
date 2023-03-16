@@ -85,7 +85,7 @@ public class Main {
 		try {
 			Path repopath = validatePath(repofile); // where repo will be stored
 			Path blockpath = validatePath(filename); // where to source the block data
-			validateFile(blockpath);
+			validateFile(blockpath,true);
 			// Initialise repo
 			Repository repo = getRepository(repopath,true);
 			
@@ -123,7 +123,7 @@ public class Main {
 		try {
 			Path repopath = validatePath(repofile); // where repo will be stored
 			Path blockpath = validatePath(filename); // where to source the block data
-			validateFile(blockpath);
+			validateFile(blockpath,false);
 			// Initialise repo
 			Repository repo = getRepository(repopath,true);
 			
@@ -234,7 +234,7 @@ public class Main {
 		}
 	}
 	
-	private static void validateFile(Path path) {
+	private static void validateFile(Path path, boolean longCheck) {
 		if (!Files.isRegularFile(path)) {
 			System.err.println("ERROR: " + path + " is not a file");
 			System.exit(255);
@@ -246,7 +246,7 @@ public class Main {
 			return;
 		}
 		try {
-			if (Files.size(path) > 65535) {
+			if (longCheck && Files.size(path) > 65535) {
 				System.err.println("ERROR: " + path + " is larger than 65535 bytes");
 				System.exit(255);
 				return;
