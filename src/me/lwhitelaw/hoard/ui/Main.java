@@ -1,6 +1,8 @@
 package me.lwhitelaw.hoard.ui;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -139,12 +141,14 @@ public class Main {
 			
 			int exitcode = 0;
 			try {
-				// Read file and write to repo
-				ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(blockpath));
+				// Open file input stream
+				InputStream stream = new BufferedInputStream(Files.newInputStream(blockpath), 65536);
 				SuperblockOutputStream sos = new SuperblockOutputStream(repo);
-				while (buffer.hasRemaining()) {
-					sos.write(buffer.get());
+				int c;
+				while ((c = stream.read()) != -1) {
+					sos.write(c);
 				}
+				stream.close();
 				sos.close();
 				byte[] hash = sos.getHash();
 				System.out.println(Hashes.hashToString(hash));
