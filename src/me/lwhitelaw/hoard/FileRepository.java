@@ -16,6 +16,8 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
+import me.lwhitelaw.hoard.RepositoryException.Reason;
+
 import static java.nio.file.StandardOpenOption.*;
 
 /**
@@ -89,7 +91,7 @@ public class FileRepository implements Repository {
 		try {
 			MessageDigest.getInstance("SHA3-256"); // should throw if not present
 		} catch (NoSuchAlgorithmException ex) {
-			throw new RepositoryException("This JDK does not support SHA3-256 hashing", ex);
+			throw new RepositoryException("This JDK does not support SHA3-256 hashing", ex, Reason.ALGORITHM_NOT_SUPPORTED);
 		}
 		lock = new ReentrantLock();
 		index = new ByteTrie<>();
@@ -330,13 +332,13 @@ public class FileRepository implements Repository {
 					decompress(encodedPayload, decodedPayload);
 				} catch (DataFormatException ex) {
 					// data was malformed! treat it as an error
-					throw new RecoverableRepositoryException("zlib decompression problem for block " + Hashes.hashToString(hash), ex);
+					throw new RecoverableRepositoryException("zlib decompression problem for block " + Hashes.hashToString(hash), ex, Reason.NOT_DECODABLE);
 				}
 				decodedPayload.flip();
 				return decodedPayload;
 			} else {
 				// format isn't known, so treat it as an error
-				throw new RecoverableRepositoryException("Unknown encoding " + Integer.toHexString(location.blockEncoding()) + " for block " + Hashes.hashToString(hash), null);
+				throw new RecoverableRepositoryException("Unknown encoding " + Integer.toHexString(location.blockEncoding()) + " for block " + Hashes.hashToString(hash), null, Reason.NOT_DECODABLE);
 			}
 		} catch (IOException ex) {
 			closeFile();
