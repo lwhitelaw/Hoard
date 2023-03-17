@@ -34,6 +34,7 @@ public class SuperblockOutputStream extends OutputStream {
 	private byte[] finalHash; // hash root of the superblock tree; null while the stream isn't closed
 	private boolean nonempty; // latches true if the stream has at least a byte of data written
 	private boolean treeFull; // latches true if the top level has 1024 blocks so no more data can be written without dropping it
+	private Chunker chunker; // computes moving sum of bytes written to determine split points
 	
 	// Header
 	private static final int HEADER_SIZE = 12;
@@ -61,6 +62,7 @@ public class SuperblockOutputStream extends OutputStream {
 		currentSuperblocks = new ByteBuffer[MAX_LEVELS];
 		nonempty = false;
 		treeFull = false;
+		chunker = new Chunker(1024,4096); // sum of last 1024 bytes, try to cut at 4K bytes
 	}
 
 	@Override
@@ -68,7 +70,11 @@ public class SuperblockOutputStream extends OutputStream {
 		if (finalHash != null) throw new IllegalStateException("Stream closed");
 		if (treeFull) throw new RecoverableRepositoryException("No more data can be written to this stream without truncation", null);
 		currentBlock.put((byte) b);
-		if (!currentBlock.hasRemaining()) {
+		// update moving sum
+		chunker.update(b);
+		// if the chunker signals a marker and there is at least 4KB in current block, write out block
+		// if the current block is a full 65535 bytes, write out also
+		if ((currentBlock.position() >= 4096 && chunker.isMarker()) || !currentBlock.hasRemaining()) {
 			// full block, push it
 			pushBlock();
 		}
