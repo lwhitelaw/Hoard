@@ -109,13 +109,13 @@ public class Main {
 				System.err.println("ERROR: I/O error");
 				exitcode = 255;
 			} catch (RepositoryException ex) {
-				System.err.println("ERROR: repository write failed");
+				System.err.println("ERROR: repository write failed: " + ex.getReason());
 				exitcode = 255;
 			} finally {
 				try {
 					repo.close();
 				} catch (RepositoryException ex) {
-					System.err.println("ERROR: repository failed to close");
+					System.err.println("ERROR: repository failed to close: " + ex.getReason());
 					exitcode = 255;
 				}
 			}
@@ -152,13 +152,13 @@ public class Main {
 				System.err.println("ERROR: I/O error");
 				exitcode = 255;
 			} catch (RepositoryException ex) {
-				System.err.println("ERROR: repository write failed");
+				System.err.println("ERROR: repository write failed: " + ex.getReason());
 				exitcode = 255;
 			} finally {
 				try {
 					repo.close();
 				} catch (RepositoryException ex) {
-					System.err.println("ERROR: repository failed to close");
+					System.err.println("ERROR: repository failed to close: " + ex.getReason());
 					exitcode = 255;
 				}
 			}
@@ -195,13 +195,13 @@ public class Main {
 					exitcode = 0;
 				}
 			} catch (RepositoryException ex) {
-				System.err.println("ERROR: repository read failed");
+				System.err.println("ERROR: repository read failed: " + ex.getReason());
 				exitcode = 255;
 			} finally {
 				try {
 					repo.close();
 				} catch (RepositoryException ex) {
-					System.err.println("ERROR: repository failed to close");
+					System.err.println("ERROR: repository failed to close: " + ex.getReason());
 					exitcode = 255;
 				}
 			}
@@ -234,13 +234,13 @@ public class Main {
 				sis.close();
 				exitcode = 0;
 			} catch (RepositoryException ex) {
-				System.err.println("ERROR: repository read failed");
+				System.err.println("ERROR: repository read failed: " + ex.getReason());
 				exitcode = 255;
 			} finally {
 				try {
 					repo.close();
 				} catch (RepositoryException ex) {
-					System.err.println("ERROR: repository failed to close");
+					System.err.println("ERROR: repository failed to close: " + ex.getReason());
 					exitcode = 255;
 				}
 			}
@@ -259,7 +259,7 @@ public class Main {
 		try {
 			return new FileRepository(repopath, writable);
 		} catch (RepositoryException ex) {
-			System.err.println("ERROR: could not open repository at " + repopath);
+			System.err.println("ERROR: could not open repository at " + repopath + ": " + ex.getReason());
 			System.exit(255);
 			return null; // never happens but keeps javac happy
 		}
