@@ -11,4 +11,8 @@ public class RecoverableRepositoryException extends RepositoryException {
 	public RecoverableRepositoryException(String message, Exception cause) {
 		super(message, cause);
 	}
+	
+	public RecoverableRepositoryException(String message, Exception cause, Reason reason) {
+		super(message, cause, reason);
+	}
 }
