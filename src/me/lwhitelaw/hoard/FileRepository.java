@@ -6,6 +6,8 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileStore;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -74,6 +76,7 @@ public class FileRepository implements Repository {
 	
 	private final ReentrantLock lock; // operation lock
 	private final ByteTrie<BlockLocation> index; // index organising hashes to offsets in file that contain their blocks
+	private final Path blocksPath; // path to the file where blocks are stored
 	private final FileChannel blocksFile; // the file where blocks are stored
 	private final boolean readOnly; // if true, writing not possible
 	private long lastFsyncEndOffset; // file offset where last fsync mark was written; data after is ignored and new writes start here
@@ -96,6 +99,7 @@ public class FileRepository implements Repository {
 		lock = new ReentrantLock();
 		index = new ByteTrie<>();
 		readOnly = !writable;
+		blocksPath = path;
 		// check writable and open file depending on mode
 		try {
 			if (writable) {
@@ -111,7 +115,7 @@ public class FileRepository implements Repository {
 				blocksFile.force(false);
 			}
 		} catch (IOException ex) {
-			throw new RepositoryException("Failed to open repository", ex);
+			throw new RepositoryException("Failed to open repository", ex, guessErrorReason(false));
 		}
 	}
 	
@@ -170,7 +174,7 @@ public class FileRepository implements Repository {
 			} catch (IOException ex) {
 				// failure of any of the above is a sync failure
 				closeFile();
-				throw new RepositoryException("Sync failed", ex);
+				throw new RepositoryException("Sync failed", ex, guessErrorReason(true));
 			}
 		} finally {
 			lock.unlock();
@@ -297,7 +301,7 @@ public class FileRepository implements Repository {
 		} catch (IOException ex) {
 			// Problem with writing; shut everything down
 			closeFile();
-			throw new RepositoryException("Problem while writing block",ex);
+			throw new RepositoryException("Problem while writing block",ex, guessErrorReason(true));
 		} finally {
 			lock.unlock();
 		}
@@ -342,7 +346,7 @@ public class FileRepository implements Repository {
 			}
 		} catch (IOException ex) {
 			closeFile();
-			throw new RepositoryException("Problem while reading block " + Hashes.hashToString(hash),ex);
+			throw new RepositoryException("Problem while reading block " + Hashes.hashToString(hash),ex, guessErrorReason(false));
 		} finally {
 			lock.unlock();
 		}
@@ -484,7 +488,7 @@ public class FileRepository implements Repository {
 		try {
 			blocksFile.close();
 		} catch (IOException ex) {
-			throw new RepositoryException("Problem when closing file", ex);
+			throw new RepositoryException("Problem when closing file", ex, guessErrorReason(true));
 		}
 	}
 	
@@ -504,6 +508,45 @@ public class FileRepository implements Repository {
 		checkOpen();
 		if (readOnly) {
 			throw new IllegalStateException("Repository is read-only");
+		}
+	}
+	
+	/**
+	 * Probe the environment to determine why an I/O operation might have failed
+	 * @param writeOperation whether the operation involved writing data
+	 * @return a speculated reason
+	 */
+	private Reason guessErrorReason(boolean writeOperation) {
+		// Try to guess why an operation might have failed
+		// Try getting the file store; if not able, classify as IO error
+		FileStore fs;
+		try {
+			fs = Files.getFileStore(blocksPath);
+			// Have file store, reasons depend on whether a write was attempted
+			// do we even have a file?
+			if (!Files.exists(blocksPath)) {
+				// file not found
+				return Reason.FILE_NOT_FOUND;
+			}
+			if (writeOperation) {
+				if (fs.getUsableSpace() < 65535) {
+					// Less than 64KB of space on storage device.
+					// Write probably failed due to lack of disk space.
+					return Reason.NO_SPACE;
+				} else {
+					// There is 64KB or more space on the device.
+					// Write may have hit a filesystem limit
+					// it's the best reason we have
+					return Reason.BACKEND_LIMIT;
+				}
+			} else {
+				// Not a write operation
+				// It's most likely an IO error
+				return Reason.IO_ERROR;
+			}
+		} catch (IOException ex) {
+			// file store access failure
+			return Reason.IO_ERROR;
 		}
 	}
 }
