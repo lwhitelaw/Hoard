@@ -144,9 +144,24 @@ public class Main {
 				// Open file input stream
 				InputStream stream = new BufferedInputStream(Files.newInputStream(blockpath), 65536);
 				SuperblockOutputStream sos = new SuperblockOutputStream(repo);
+				// Metrics
+				long startTime = System.currentTimeMillis();
+				long prevSample = startTime;
+				long transferred = 0;
+				long prevTransferred = 0;
+				long total = Files.size(blockpath);
+				
 				int c;
 				while ((c = stream.read()) != -1) {
 					sos.write(c);
+					transferred++;
+					if ((transferred & 0xFFFFF) == 0 && (System.currentTimeMillis()-prevSample) >= 5000) {
+						long now = System.currentTimeMillis();
+						System.out.println(StatusLine.formatTransferProgress(now, prevSample, startTime, transferred, prevTransferred, total, filename));
+						prevTransferred = transferred;
+						prevSample = now;
+						repo.sync();
+					}
 				}
 				stream.close();
 				sos.close();
