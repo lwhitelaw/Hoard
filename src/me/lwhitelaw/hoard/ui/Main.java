@@ -160,7 +160,7 @@ public class Main {
 						System.out.println(StatusLine.formatTransferProgress(now, prevSample, startTime, transferred, prevTransferred, total, filename));
 						prevTransferred = transferred;
 						prevSample = now;
-						repo.sync();
+//						repo.sync();
 					}
 				}
 				stream.close();
