@@ -89,6 +89,8 @@ public class FileRepository implements Repository {
 	private final FileChannel blocksFile; // the file where blocks are stored
 	private final boolean readOnly; // if true, writing not possible
 	private long lastFsyncEndOffset; // file offset where last fsync mark was written; data after is ignored and new writes start here
+	// internal cached variables
+	private final MessageDigest hasher; // hasher used in hash()
 	
 	/**
 	 * Access a block repository on the specified file. If <code>writable</code> is <code>true</code>, the repository
@@ -101,7 +103,7 @@ public class FileRepository implements Repository {
 	 */
 	public FileRepository(Path path, boolean writable) {
 		try {
-			MessageDigest.getInstance("SHA3-256"); // should throw if not present
+			hasher = MessageDigest.getInstance("SHA3-256"); // should throw if not present
 		} catch (NoSuchAlgorithmException ex) {
 			throw new RepositoryException("This JDK does not support SHA3-256 hashing", ex, Reason.ALGORITHM_NOT_SUPPORTED);
 		}
@@ -265,10 +267,10 @@ public class FileRepository implements Repository {
 		checkOpenAndWritable();
 		int sourcelength = data.remaining();
 		if (sourcelength > 65535) throw new IllegalArgumentException("Data length of " + sourcelength + " is longer than the maximum of 65535 bytes");
-		// hash data
-		byte[] hash = hash(data);
 		lock.lock();
 		try {
+			// hash data
+			byte[] hash = hash(data);
 			if (index.containsKey(hash)) {
 				// already in index and file, nothing to write
 				return hash;
@@ -365,14 +367,10 @@ public class FileRepository implements Repository {
 	 * @param data data to hash
 	 * @return SHA3-256 hash of the data
 	 */
-	public static byte[] hash(ByteBuffer data) {
-		try {
-			MessageDigest digest = MessageDigest.getInstance("SHA3-256");
-			digest.update(data);
-			return digest.digest();
-		} catch (NoSuchAlgorithmException ex) {
-			throw new RepositoryException("should not happen",ex);
-		}
+	private byte[] hash(ByteBuffer data) {
+		hasher.reset();
+		hasher.update(data);
+		return hasher.digest();
 	}
 	
 	/**
