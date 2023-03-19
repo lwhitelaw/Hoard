@@ -58,6 +58,15 @@ public class FileRepository implements Repository {
 	than once in the file using multiple encodings.
 	*/
 	
+	/*
+	 * Profiling takeaways
+	 * - Too much memory allocation
+	 * - ByteTrie has overhead
+	 * - Compression/decompression is expensive
+	 * - Hashing is too
+	 * - Can these be made parallel?
+	 */
+	
 	private static final int HEADER_SIZE = 48; // size of the header in bytes
 	// Offsets into the header
 	private static final int HEADER_OFFS_MAGIC = 0; // Magic value (should be HEADER_MAGIC)
@@ -269,8 +278,7 @@ public class FileRepository implements Repository {
 			// compress data into new buffer to hold encoded payload
 			ByteBuffer outData = ByteBuffer.allocate(65535).order(ByteOrder.BIG_ENDIAN); // max size
 			// might as well use best compression, since it'll only be compressed once
-			boolean zlibSuccess = compress(Deflater.BEST_COMPRESSION, data, outData);
-			if (FORCE_RAW) zlibSuccess = false;
+			boolean zlibSuccess = FORCE_RAW? false : compress(Deflater.BEST_COMPRESSION, data, outData);
 			if (!zlibSuccess) {
 				// compression failure, just recopy it without compression
 				outData.clear();
