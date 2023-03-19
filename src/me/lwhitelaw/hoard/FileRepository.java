@@ -91,6 +91,7 @@ public class FileRepository implements Repository {
 	private long lastFsyncEndOffset; // file offset where last fsync mark was written; data after is ignored and new writes start here
 	// internal cached variables
 	private final MessageDigest hasher; // hasher used in hash()
+	private final ByteBuffer writeBuffer; // long-lived buffer used to hold data yet to be written
 	
 	/**
 	 * Access a block repository on the specified file. If <code>writable</code> is <code>true</code>, the repository
@@ -115,8 +116,11 @@ public class FileRepository implements Repository {
 		try {
 			if (writable) {
 				blocksFile = FileChannel.open(path,CREATE,READ,WRITE);
+				// make write buffer if writable
+				writeBuffer = ByteBuffer.allocateDirect(HEADER_SIZE + 65535).order(ByteOrder.BIG_ENDIAN);
 			} else {
 				blocksFile = FileChannel.open(path,READ);
+				writeBuffer = null;
 			}
 			// parse blocks and build the index
 			initIndex(false);
@@ -277,8 +281,10 @@ public class FileRepository implements Repository {
 			}
 			// rewind buffer to be read again
 			data.rewind();
-			// compress data into new buffer to hold encoded payload
-			ByteBuffer outData = ByteBuffer.allocate(65535).order(ByteOrder.BIG_ENDIAN); // max size
+			// clear write buffer, and compress data into it via a view buffer
+			writeBuffer.clear();
+			// setup view buffer
+			ByteBuffer outData = writeBuffer.position(HEADER_OFFS_PAYLOAD).slice().order(ByteOrder.BIG_ENDIAN);
 			// might as well use best compression, since it'll only be compressed once
 			boolean zlibSuccess = FORCE_RAW? false : compress(Deflater.BEST_COMPRESSION, data, outData);
 			if (!zlibSuccess) {
@@ -287,22 +293,21 @@ public class FileRepository implements Repository {
 				data.rewind();
 				outData.put(data);
 			}
-			// outData holds compressed (or not) output, zlibSuccess is true if data is compressed
-			// outData: "filling" -> "draining"
-			outData.flip();
-			// create the final write buffer (holding header and payload) and write header into it
-			ByteBuffer writeBuffer = ByteBuffer.allocate(HEADER_SIZE + outData.remaining()).order(ByteOrder.BIG_ENDIAN);
+			// outData is a view on the payload area of the writebuffer, so that is done.
+			// Flip the outData buffer so the size can be determined
+			// outData no longer needed after this point
+			int encodedlength = outData.flip().remaining();
 			int encoding = zlibSuccess? ZLIB_ENCODING : RAW_ENCODING;
-			int encodedlength = outData.remaining(); // the size of the encoded data
+			// Position writebuffer at zero and write in the header
+			writeBuffer.position(0);
 			makeHeader(writeBuffer, hash, encoding, (short) sourcelength, (short) encodedlength);
-			// copy the payload into it
-			writeBuffer.put(outData);
+			// set the writebuffer position to zero and limit to header + the payload size to get ready to write
+			writeBuffer.rewind().limit(HEADER_SIZE + encodedlength);
 			// move to end of file
 			blocksFile.position(blocksFile.size());
 			// before writing, save where the payload is expected to be
 			long payloadLocation = blocksFile.position() + HEADER_SIZE;
 			// write the block
-			writeBuffer.flip();
 			writeFully(blocksFile, writeBuffer);
 			// update the index
 			BlockLocation location = new BlockLocation(hash, payloadLocation, encoding, (short) sourcelength, (short) encodedlength);
