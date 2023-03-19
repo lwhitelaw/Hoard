@@ -279,25 +279,39 @@ public class FileRepository implements Repository {
 				// already in index and file, nothing to write
 				return hash;
 			}
-			// rewind buffer to be read again
+			// rewind buffer to be read again, see if the data may be compressible.
+			data.rewind();
+			boolean compressible = FORCE_RAW? false : Compression.isLikelyCompressible(data, 0.1f);
+			// rewind buffer to be read *again*
 			data.rewind();
 			// clear write buffer, and compress data into it via a view buffer
 			writeBuffer.clear();
 			// setup view buffer
 			ByteBuffer outData = writeBuffer.position(HEADER_OFFS_PAYLOAD).slice().order(ByteOrder.BIG_ENDIAN);
-			// might as well use best compression, since it'll only be compressed once
-			boolean zlibSuccess = FORCE_RAW? false : compress(Deflater.BEST_COMPRESSION, data, outData);
-			if (!zlibSuccess) {
-				// compression failure, just recopy it without compression
-				outData.clear();
-				data.rewind();
+			// did we determine if data is compressible?
+			boolean compressed = true; // true if the data was actually compressed
+			if (compressible) {
+				// Yes. Attempt compression using zlib.
+				// might as well use best compression, since it'll only be compressed once
+				boolean zlibSuccess = compress(Deflater.BEST_COMPRESSION, data, outData);
+				if (!zlibSuccess) {
+					// compression failure, just recopy it without compression
+					outData.clear();
+					data.rewind();
+					outData.put(data);
+					compressed = false;
+				}
+			} else {
+				// No. Copy data without compressing it.
 				outData.put(data);
+				compressed = false;
 			}
+			
 			// outData is a view on the payload area of the writebuffer, so that is done.
 			// Flip the outData buffer so the size can be determined
 			// outData no longer needed after this point
 			int encodedlength = outData.flip().remaining();
-			int encoding = zlibSuccess? ZLIB_ENCODING : RAW_ENCODING;
+			int encoding = compressed? ZLIB_ENCODING : RAW_ENCODING;
 			// Position writebuffer at zero and write in the header
 			writeBuffer.position(0);
 			makeHeader(writeBuffer, hash, encoding, (short) sourcelength, (short) encodedlength);
