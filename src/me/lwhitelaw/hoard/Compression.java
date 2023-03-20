@@ -19,7 +19,7 @@ class Compression {
 	 * @return true if the input is likely compressible
 	 */
 	static boolean isLikelyCompressible(ByteBuffer buf, float threshold) {
-		if (buf.hasRemaining()) return false;
+		if (!buf.hasRemaining()) return false;
 		byte[] order1 = new byte[256]; // contains the last byte seen when the previous byte was a given value
 		byte context = 0x0; // last byte seen
 		int hits = 0; // number of times correctly predicted
@@ -36,7 +36,7 @@ class Compression {
 			// shift context to the byte just seen
 			context = input;
 		}
-		
+		System.err.println(((float) hits / (float) total));
 		return ((float) hits / (float) total) >= threshold;
 	}
 }
