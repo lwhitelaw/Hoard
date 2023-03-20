@@ -36,7 +36,6 @@ class Compression {
 			// shift context to the byte just seen
 			context = input;
 		}
-		System.err.println(((float) hits / (float) total));
 		return ((float) hits / (float) total) >= threshold;
 	}
 }
