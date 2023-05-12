@@ -293,7 +293,7 @@ public class FileRepository implements Repository {
 			if (compressible) {
 				// Yes. Attempt compression using zlib.
 				// might as well use best compression, since it'll only be compressed once
-				boolean zlibSuccess = compress(Deflater.BEST_COMPRESSION, data, outData);
+				boolean zlibSuccess = compress(Deflater.BEST_SPEED, data, outData);
 				if (!zlibSuccess) {
 					// compression failure, just recopy it without compression
 					outData.clear();

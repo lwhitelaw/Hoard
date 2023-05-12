@@ -155,7 +155,7 @@ public class Main {
 				while ((c = stream.read()) != -1) {
 					sos.write(c);
 					transferred++;
-					if ((transferred & 0xFFFFF) == 0 && (System.currentTimeMillis()-prevSample) >= 5000) {
+					if ((System.currentTimeMillis()-prevSample) >= 2000) {
 						long now = System.currentTimeMillis();
 						System.out.println(StatusLine.formatTransferProgress(now, prevSample, startTime, transferred, prevTransferred, total, filename));
 						prevTransferred = transferred;
