@@ -62,7 +62,7 @@ public class SuperblockOutputStream extends OutputStream {
 		currentSuperblocks = new ByteBuffer[MAX_LEVELS];
 		nonempty = false;
 		treeFull = false;
-		chunker = new Chunker(1024,4096); // sum of last 1024 bytes, try to cut at 4K bytes
+		chunker = new Chunker(10,12); // sum of last 1024 bytes, try to cut at 4K bytes
 	}
 
 	@Override
