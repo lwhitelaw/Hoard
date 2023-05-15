@@ -67,6 +67,20 @@ public class FileRepository implements Repository {
 	 * - Can these be made parallel?
 	 */
 	
+	/*
+	 * Future:
+	 * The concept here is flawed. Using a single file like this has drawbacks
+	 * - One file. Readers and writers must contend for locks.
+	 * - Append-only. Consistency guarantees enforce this design, preventing indexing and leading to slow loading times.
+	 * - Bookkeeping has to be done on every load and updated on every modification.
+	 * Fundamentally, the problem requirements are looser than what is enforced here.
+	 * - Operations tend to be composed of mostly reads or mostly writes, not interspersed.
+	 * - In general, a lot of blocks are written at once, as if a transaction. Writes could be deferred.
+	 * - The reason to use one file was to keep filesystem overhead down, but there is no need to constrain oneself to one file.
+	 * - If data blocks never change once written, then a file containing them need not have to change either.
+	 * - The above means that an index could be baked once into the file, so it never has to be read back in.
+	 */
+	
 	private static final int HEADER_SIZE = 48; // size of the header in bytes
 	// Offsets into the header
 	private static final int HEADER_OFFS_MAGIC = 0; // Magic value (should be HEADER_MAGIC)
