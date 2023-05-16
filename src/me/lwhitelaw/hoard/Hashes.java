@@ -1,5 +1,9 @@
 package me.lwhitelaw.hoard;
 
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 /**
  * Utilities for working with hashes.
  *
@@ -67,5 +71,40 @@ public final class Hashes {
 			o++;
 		}
 		return out;
+	}
+	
+	/**
+	 * Compare two byte arrays for ordering.
+	 * @param a first array
+	 * @param b second array
+	 * @return -1, 0, 1 if a < b, a == b, a > b
+	 */
+	public static int compare(byte[] a, byte[] b) {
+		int minLen = Math.min(a.length, b.length);
+		for (int i = 0; i < minLen; i++) {
+			int byteA = a[i] & 0xFF;
+			int byteB = b[i] & 0xFF;
+			if (byteA > byteB) return 1;
+			if (byteA < byteB) return -1;
+		}
+		// all bytes identical, shorter lengths come first
+		if (a.length > b.length) return 1;
+		if (a.length < b.length) return -1;
+		return 0;
+	}
+	
+	private static final ThreadLocal<MessageDigest> SHA3_256 = ThreadLocal.withInitial(() -> {
+		try {
+			return MessageDigest.getInstance("SHA3-256");
+		} catch (NoSuchAlgorithmException ex) {
+			throw new AssertionError("JDK does not support SHA3-256",ex);
+		}
+	});
+	
+	public static byte[] doHash(ByteBuffer input) {
+		MessageDigest sha3 = SHA3_256.get();
+		sha3.reset();
+		sha3.update(input);
+		return sha3.digest();
 	}
 }

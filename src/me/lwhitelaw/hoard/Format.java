@@ -26,7 +26,7 @@ public class Format {
 	 * 		byte[8] encoding;
 	 * 		int32 length;
 	 * 		int32 encodedLength;
-	 * 		int64 payloadPointer; // to byte[encodedLength] in the data area
+	 * 		int64 payloadPointer; // to byte[encodedLength] in the data area. Pointer is offset from start of this data area.
 	 * 		byte[8] reserved; // reserved for future versions
 	 * }
 	 */
