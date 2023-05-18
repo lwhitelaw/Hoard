@@ -22,4 +22,19 @@ public class Buffers {
 		}
 		return newBuffer;
 	}
+	
+	/**
+	 * Like {@link ByteBuffer#put(ByteBuffer)}, but does not throw on underflow. Instead it puts as much data as will fit.
+	 * @param target Target buffer to copy into
+	 * @param src Source buffer to copy from
+	 * @return The target buffer
+	 */
+	public static ByteBuffer putOptimistically(ByteBuffer target, ByteBuffer src) {
+		if (target.remaining() < src.remaining()) {
+			while (target.hasRemaining()) target.put(src.get());
+		} else {
+			target.put(src);
+		}
+		return target;
+	}
 }

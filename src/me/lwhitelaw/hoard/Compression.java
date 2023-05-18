@@ -1,6 +1,11 @@
 package me.lwhitelaw.hoard;
 
 import java.nio.ByteBuffer;
+import java.util.zip.DataFormatException;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
+
+import me.lwhitelaw.hoard.util.Buffers;
 
 /**
  * Compression utilities.
@@ -37,5 +42,109 @@ class Compression {
 			context = input;
 		}
 		return ((float) hits / (float) total) >= threshold;
+	}
+	
+	/**
+	 * Compress the input buffer's data into the output buffer, consuming the input buffer's data.
+	 * If there is not enough space to hold the output, this method will return <code>false</code>.
+	 * In this case, the input buffer will only be partially consumed and the output buffer
+	 * filled with the compressed data that did fit. <code>false</code> will also be returned
+	 * if ZLIB expands the input.
+	 * @param level the ZLIB compression level to use, from 0-9
+	 * @param input input data to compress
+	 * @param output output buffer for compressed data
+	 * @return true on success, false on failure due to lack of space or expansion.
+	 */
+	private static boolean compress(int level, ByteBuffer input, ByteBuffer output) {
+		int inputSize = input.remaining();
+		int outputStart = output.position();
+		Deflater deflater = new Deflater(level);
+		try {
+			deflater.setInput(input);
+			deflater.finish();
+			while (!deflater.finished()) {
+				if (!output.hasRemaining()) {
+					// out of space! Unlikely unless the input is really incompressible
+					return false;
+				}
+				deflater.deflate(output);
+			}
+		} finally {
+			deflater.end();
+		}
+		// compression succeeded, but is it actually smaller?
+		if (inputSize < output.position()-outputStart) {
+			return false; // it isn't, so fail
+		}
+		return true;
+	}
+	
+	/**
+	 * Compress the input buffer's data into the output buffer, consuming the input buffer's data if
+	 * the data is detected as compressible based on the given threshold.
+	 * If there is not enough space to hold the output, the data will be copied as-is.
+	 * The return value indicates whether the data was compressed.
+	 * @param level the ZLIB compression level to use, from 0-9
+	 * @param input input data to compress
+	 * @param output output buffer for compressed data
+	 * @return true if the data is compressed, or false if copied raw
+	 */
+	public static boolean compressHeuristically(float threshold, int level, ByteBuffer input, ByteBuffer output) {
+		// Ensure the output buffer will always have enough room to hold the input if copied raw.
+		if (input.remaining() > output.remaining()) {
+			throw new IllegalStateException(String.format("Not enough room for a raw copy. Input remaining: %d, output remaining: %d",input.remaining(),output.remaining()));
+		}
+		// Determine if the data *should* be compressed.
+		boolean shouldTryCompress = isLikelyCompressible(input.duplicate(), threshold);
+		if (!shouldTryCompress) {
+			// Don't try compressing, copy as-is and return.
+			output.put(input);
+			return false;
+		} else {
+			// Save the buffer states in case we have to restart the operation.
+			// Mark can't be saved, but OpenJDK states mark is not discarded unless position/limit < mark.
+			// This invariant will not be violated so that isn't a problem.
+			int inputPosition = input.position();
+			int inputLimit = input.limit();
+			int outputPosition = output.position();
+			int outputLimit = output.limit();
+			// Attempt compressing the data.
+			boolean success = compress(level, input, output);
+			// If compression succeeds, our job here is done. Return true.
+			if (success) return true;
+			// Compression failed. Rewind the state and copy as-is.
+			input.limit(inputLimit).position(inputPosition);
+			output.limit(outputLimit).position(outputPosition);
+			output.put(input);
+			return false;
+		}
+	}
+	
+	/**
+	 * Decompress the input buffer's data into the output buffer, consuming the input buffer's data.
+	 * If there is not enough space to hold the output, this method will return <code>false</code>.
+	 * In this case, the input buffer will only be partially consumed and the output buffer
+	 * filled with the decompressed data that did fit. DataFormatException will be thrown if for some
+	 * reason the compressed input is not in valid ZLIB format.
+	 * @param input input data to decompress
+	 * @param output output buffer for decompressed data
+	 * @return true on success, false on failure due to lack of space.
+	 * @throws DataFormatException if the input data is malformed
+	 */
+	private static boolean decompress(ByteBuffer input, ByteBuffer output) throws DataFormatException {
+		Inflater inflater = new Inflater();
+		try {
+			inflater.setInput(input);
+			while (!inflater.finished()) {
+				if (!output.hasRemaining()) {
+					// out of space! likely if the compression ratio is unexpectedly high
+					return false;
+				}
+				inflater.inflate(output);
+			}
+		} finally {
+			inflater.end();
+		}
+		return true;
 	}
 }
