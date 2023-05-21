@@ -14,12 +14,20 @@ import java.util.List;
 import me.lwhitelaw.hoard.util.Buffers;
 
 public final class PackfileWriter implements Repository {
-	private List<PackfileEntry> entries;
-	private ByteBuffer dataArea;
+	private final List<PackfileEntry> entries;
+	private final ByteBuffer dataArea;
 	
 	public PackfileWriter(int dataAreaSize) {
 		dataArea = ByteBuffer.allocate(dataAreaSize);
 		entries = new ArrayList<>();
+	}
+	
+	/**
+	 * Clear all data in this packfile writer.
+	 */
+	public void reset() {
+		entries.clear();
+		dataArea.clear();
 	}
 
 	@Override
