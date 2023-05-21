@@ -84,6 +84,8 @@ public final class PackfileWriter implements Repository {
 	}
 	
 	public void write(Path path) throws IOException {
+		// Sort the list by ascending hash order
+		entries.sort((a,b) -> Hashes.compare(a.getHash(), b.getHash()));
 		// Open file
 		FileChannel file = FileChannel.open(path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
 		// Write out header
