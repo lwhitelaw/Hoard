@@ -10,6 +10,8 @@ import java.util.Arrays;
  *
  */
 public class PackfileEntry {
+	public static final int BYTES = Format.ENTRY_SIZE;
+	
 	private final byte[] hash;
 	private final long encoding;
 	private final int length;

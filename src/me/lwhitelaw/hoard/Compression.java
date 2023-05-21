@@ -94,8 +94,8 @@ class Compression {
 		if (input.remaining() > output.remaining()) {
 			throw new IllegalStateException(String.format("Not enough room for a raw copy. Input remaining: %d, output remaining: %d",input.remaining(),output.remaining()));
 		}
-		// Determine if the data *should* be compressed.
-		boolean shouldTryCompress = isLikelyCompressible(input.duplicate(), threshold);
+		// Determine if the data *should* be compressed. If level is zero, don't bother trying.
+		boolean shouldTryCompress = level != 0 && isLikelyCompressible(input.duplicate(), threshold);
 		if (!shouldTryCompress) {
 			// Don't try compressing, copy as-is and return.
 			output.put(input);
