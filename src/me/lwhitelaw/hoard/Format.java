@@ -64,10 +64,31 @@ public class Format {
 	public static int checkHeader(FileChannel channel) throws IOException {
 		ByteBuffer hbuf = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
 		channel.position(HEADER_OFFS_MAGIC);
-		Buffers.readFully(channel, hbuf); // needs to check EOF
+		Buffers.readFully(channel, hbuf);
+		// check EOF
+		if (hbuf.hasRemaining()) throw new IOException("Unexpected end of file");
+		// check magic is valid
 		if (hbuf.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) throw new IOException("Incorrect magic value");
+		// extract and check blocktable length
 		int length = hbuf.getInt(HEADER_OFFS_BLOCKTABLE_LENGTH);
 		if (length < 0) throw new IOException("Blocktable length is invalid: " + length);
 		return length;
+	}
+	
+	public static PackfileEntry getBlocktableEntry(FileChannel channel, int index) throws IOException {
+		ByteBuffer ebuf = ByteBuffer.allocate(ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
+		long filePosition = (long)ENTRY_SIZE * (long)index + (long)HEADER_SIZE;
+		channel.position(filePosition);
+		Buffers.readFully(channel, ebuf);
+		// check EOF
+		if (ebuf.hasRemaining()) throw new IOException("Unexpected end of file");
+		// create object
+		// PackfileEntry will do its own checks
+		try {
+			ebuf.flip();
+			return PackfileEntry.fromBuffer(ebuf);
+		} catch (IllegalArgumentException ex) {
+			throw new IOException(ex.getMessage());
+		}
 	}
 }

@@ -1,5 +1,6 @@
 package me.lwhitelaw.hoard;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -24,6 +25,10 @@ public class PackfileEntry {
 		this.length = length;
 		this.encodedLength = encodedLength;
 		this.payloadIndex = payloadIndex;
+		// check length >= encodedLength
+		if (!(length >= encodedLength)) throw new IllegalArgumentException("Length is smaller than encoded length");
+		// check payload pointer not negative
+		if (payloadIndex < 0) throw new IllegalArgumentException("Payload index is negative");
 	}
 	
 	public byte[] getHash() {
@@ -99,12 +104,12 @@ public class PackfileEntry {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 7; i >= 0; i--) {
 			int targetByte = ((int)(encoding >>> (8*i))) & 0xFF;
-			if (i >= 32 && i <= 126) {
-				sb.append((char) i);
-			} else if (i < 10) {
-				sb.append("\\x0").append(Integer.toHexString(i));
+			if (targetByte >= 32 && targetByte <= 126) {
+				sb.append((char) targetByte);
+			} else if (targetByte < 10) {
+				sb.append("\\x0").append(Integer.toHexString(targetByte));
 			} else {
-				sb.append("\\x").append(Integer.toHexString(i));
+				sb.append("\\x").append(Integer.toHexString(targetByte));
 			}
 		}
 		return sb.toString();
