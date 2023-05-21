@@ -4,8 +4,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
 
 public final class PackfileWriter implements Repository {
+	private List<PackfileEntry> entries;
 	private ByteBuffer dataArea;
 	
 	public PackfileWriter(int dataAreaSize) {
