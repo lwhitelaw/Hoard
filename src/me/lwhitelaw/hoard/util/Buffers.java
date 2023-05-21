@@ -1,6 +1,9 @@
 package me.lwhitelaw.hoard.util;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 
 public class Buffers {
 	/**
@@ -36,5 +39,40 @@ public class Buffers {
 			target.put(src);
 		}
 		return target;
+	}
+	
+	/**
+	 * Fully write this buffer to the channel, repeating until the buffer is drained.
+	 * @param chan Channel to write to
+	 * @param buf Buffer to drain
+	 * @return the number of bytes written, which will be the number of bytes remaining
+	 * @throws IOException if an I/O error occurs
+	 */
+	public static int writeFully(WritableByteChannel chan, ByteBuffer buf) throws IOException {
+		int bytes = 0;
+		while (buf.hasRemaining()) {
+			bytes += chan.write(buf);
+		}
+		return bytes;
+	}
+	
+	/**
+	 * Fully read data into this buffer from the channel, repeating until the buffer is filled or
+	 * end of stream is signalled.
+	 * @param chan Channel to read from
+	 * @param buf Buffer to fill
+	 * @return the number of bytes read
+	 * @throws IOException if an I/O error occurs
+	 */
+	public static int readFully(ReadableByteChannel chan, ByteBuffer buf) throws IOException {
+		int bytes = 0;
+		while (buf.hasRemaining()) {
+			int readResult = chan.read(buf);
+			if (readResult == -1) {
+				return bytes;
+			}
+			bytes += readResult;
+		}
+		return bytes;
 	}
 }
