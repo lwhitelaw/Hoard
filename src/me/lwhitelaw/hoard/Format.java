@@ -1,8 +1,15 @@
 package me.lwhitelaw.hoard;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
+
+import me.lwhitelaw.hoard.util.Buffers;
+
 /**
- * Constant values describing important values in a Hoard packfile.
- * All values are big-endian.
+ * Constant values describing important values in a Hoard packfile, along with utility methods to read data present.
+ * All values are stored in a packfile big-endian.
  */
 public class Format {
 	/* 
@@ -45,5 +52,22 @@ public class Format {
 	// Magic values
 	public static final long HEADER_MAGIC = 0x486F6172_64207631L; // "Hoard v1", start of a file
 	public static final long RAW_ENCODING = 0x00000000_00000000L; // raw encoded payload
-	public static final long ZLIB_ENCODING = 0x00000000_5A4C4942L; // "\0\0\0\0ZLIB", zlib encoded payload
+	public static final long ZLIB_ENCODING = 0x00000000_5A4C4942L; // "\x00\x00\x00\x00ZLIB", zlib encoded payload
+	
+	// Utilities
+	/**
+	 * Check the header for a valid magic value and return the blocktable length.
+	 * @param channel the file to read from.
+	 * @return the length of the block table
+	 * @throws IOException if there are problems reading the file, if the magic value is not correct, or if the block table length is invalid
+	 */
+	public static int checkHeader(FileChannel channel) throws IOException {
+		ByteBuffer hbuf = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
+		channel.position(HEADER_OFFS_MAGIC);
+		Buffers.readFully(channel, hbuf); // needs to check EOF
+		if (hbuf.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) throw new IOException("Incorrect magic value");
+		int length = hbuf.getInt(HEADER_OFFS_BLOCKTABLE_LENGTH);
+		if (length < 0) throw new IOException("Blocktable length is invalid: " + length);
+		return length;
+	}
 }
