@@ -157,31 +157,34 @@ public class PackfileReader implements Repository {
 	public PackfileEntry locateEntryForHash(byte[] hash) throws IOException {
 		// An empty table will never succeed a search.
 		if (blocktableLength == 0) return null;
-		// Classical binary search
-		// Bounds are inclusive.
+		// Classical binary search, bounds are inclusive.
+		// Failure checks are placed in both comparisons to enforce that neither low nor
+		// high leave the bounds of the array over the algorithm's execution.
 		int low = 0;
 		int high = blocktableLength - 1;
-		while (true) {
+		// loop until returned from
+		while (low <= high) {
 			// Find the midpoint. Calculation is written to avoid overflow.
 			int mid = low + (high - low) / 2;
 			// Grab this entry.
 			PackfileEntry midEntry = getBlocktableEntry(mid);
 			// Run comparison check against the target hash.
 			int comparison = Hashes.compare(hash, midEntry.getHash());
-			if (comparison == 0) {
-				// Hashes are equal! Return it.
-				return midEntry;
+			if (comparison > 0) {
+				// Hash is greater than the midpoint hash.
+				if (mid == high) return null; // no upper entries remain, fail the search
+				// Cut to above middle
+				low = mid + 1;
 			} else if (comparison < 0) {
 				// Hash is less than the midpoint hash.
 				if (mid == low) return null; // no lower entries remain, fail the search
 				// Cut to below middle
 				high = mid - 1;
 			} else {
-				// Hash is greater than the midpoint hash.
-				if (mid == high) return null; // no upper entries remain, fail the search
-				// Cut to above middle
-				low = mid + 1;
+				// Hashes are equal! Return it.
+				return midEntry;
 			}
 		}
+		throw new AssertionError("low > high, this should not happen");
 	}
 }
