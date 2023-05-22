@@ -33,8 +33,13 @@ public class PackfileReader implements Repository {
 
 	@Override
 	public ByteBuffer readBlock(byte[] hash) {
-		// TODO Auto-generated method stub
-		return null;
+		try {
+			PackfileEntry entry = locateEntryForHash(hash);
+			if (entry == null) return null;
+			return readPackfileEntryPayload(entry);
+		} catch (IOException ex) {
+			throw new RepositoryException(ex);
+		}
 	}
 
 	@Override
