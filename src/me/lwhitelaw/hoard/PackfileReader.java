@@ -16,7 +16,7 @@ public class PackfileReader implements Repository {
 	
 	public PackfileReader(Path filePath) throws IOException {
 		file = FileChannel.open(filePath, StandardOpenOption.READ);
-		blocktableLength = Format.checkHeader(file);
+		blocktableLength = checkHeader();
 	}
 
 	@Override
