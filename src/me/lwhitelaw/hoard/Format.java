@@ -75,6 +75,13 @@ public class Format {
 		return length;
 	}
 	
+	/**
+	 * Get the entry in the block table at the specified index. <b>No bounds-checking is performed.</b>
+	 * @param channel the file to read from.
+	 * @param index the index into the block table to read
+	 * @return the block table entry
+	 * @throws IOException if there are problems reading the file or if the entry is malformed
+	 */
 	public static PackfileEntry getBlocktableEntry(FileChannel channel, int index) throws IOException {
 		ByteBuffer ebuf = ByteBuffer.allocate(ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
 		long filePosition = (long)ENTRY_SIZE * (long)index + (long)HEADER_SIZE;
