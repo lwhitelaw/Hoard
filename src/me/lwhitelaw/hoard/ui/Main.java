@@ -19,6 +19,8 @@ import java.util.List;
 import me.lwhitelaw.hoard.ByteTrie;
 import me.lwhitelaw.hoard.FileRepository;
 import me.lwhitelaw.hoard.Hashes;
+import me.lwhitelaw.hoard.PackfileReader;
+import me.lwhitelaw.hoard.PackfileWriter;
 import me.lwhitelaw.hoard.RecoverableRepositoryException;
 import me.lwhitelaw.hoard.Repository;
 import me.lwhitelaw.hoard.RepositoryException;
@@ -175,6 +177,9 @@ public class Main {
 				exitcode = 255;
 			} finally {
 				try {
+					if (repo instanceof PackfileWriter) {
+						((PackfileWriter) repo).write(repopath);
+					}
 					repo.close();
 				} catch (RepositoryException ex) {
 					System.err.println("ERROR: repository failed to close: " + ex.getReason());
@@ -275,12 +280,23 @@ public class Main {
 	
 	private static Repository getRepository(Path repopath, boolean writable) {
 		checkSHA3();
-		try {
-			return new FileRepository(repopath, writable);
-		} catch (RepositoryException ex) {
-			System.err.println("ERROR: could not open repository at " + repopath + ": " + ex.getReason());
-			System.exit(255);
-			return null; // never happens but keeps javac happy
+//		try {
+//			return new FileRepository(repopath, writable);
+//		} catch (RepositoryException ex) {
+//			System.err.println("ERROR: could not open repository at " + repopath + ": " + ex.getReason());
+//			System.exit(255);
+//			return null; // never happens but keeps javac happy
+//		}
+		if (writable) {
+			return new PackfileWriter(Integer.MAX_VALUE-16);
+		} else {
+			try {
+				return new PackfileReader(repopath);
+			} catch (IOException ex) {
+				System.err.println("ERROR: could not open repository at " + repopath);
+				System.exit(255);
+				return null;
+			}
 		}
 	}
 	
