@@ -95,6 +95,12 @@ public class PackfileReader implements Repository {
 		}
 	}
 	
+	/**
+	 * Read the payload for a packfile entry.
+	 * @param entry the entry to read
+	 * @return the decoded payload data
+	 * @throws IOException if reading is not possible
+	 */
 	public ByteBuffer readPackfileEntryPayload(PackfileEntry entry) throws IOException {
 		// Calculate position into the file based on the packfile index
 		// Calculate data area start - this will not overflow
@@ -134,6 +140,43 @@ public class PackfileReader implements Repository {
 		} else {
 			// the encoding type is not recognised
 			throw new IOException("encoding type unknown: " + PackfileEntry.encodingToString(entry.getEncoding()));
+		}
+	}
+	
+	/**
+	 * Search the block table for the entry named by the provided hash. Null will be returned if it is not present.
+	 * @param hash the hash to search for
+	 * @return the block table entry, or null if not found
+	 * @throws IOException if there is a problem reading the file
+	 */
+	public PackfileEntry locateEntryForHash(byte[] hash) throws IOException {
+		// An empty table will never succeed a search.
+		if (blocktableLength == 0) return null;
+		// Classical binary search
+		// Bounds are inclusive.
+		int low = 0;
+		int high = blocktableLength - 1;
+		while (true) {
+			// Find the midpoint. Calculation is written to avoid overflow.
+			int mid = low + (high - low) / 2;
+			// Grab this entry.
+			PackfileEntry midEntry = getBlocktableEntry(mid);
+			// Run comparison check against the target hash.
+			int comparison = Hashes.compare(hash, midEntry.getHash());
+			if (comparison == 0) {
+				// Hashes are equal! Return it.
+				return midEntry;
+			} else if (comparison < 0) {
+				// Hash is less than the midpoint hash.
+				if (mid == low) return null; // no lower entries remain, fail the search
+				// Cut to below middle
+				high = mid - 1;
+			} else {
+				// Hash is greater than the midpoint hash.
+				if (mid == high) return null; // no upper entries remain, fail the search
+				// Cut to above middle
+				low = mid + 1;
+			}
 		}
 	}
 }
