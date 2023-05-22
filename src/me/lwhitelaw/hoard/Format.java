@@ -1,12 +1,5 @@
 package me.lwhitelaw.hoard;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
-
-import me.lwhitelaw.hoard.util.Buffers;
-
 /**
  * Constant values describing important values in a Hoard packfile, along with utility methods to read data present.
  * All values are stored in a packfile big-endian.

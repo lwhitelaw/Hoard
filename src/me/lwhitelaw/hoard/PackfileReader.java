@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.zip.DataFormatException;
 
-import me.lwhitelaw.hoard.RepositoryException.Reason;
 import me.lwhitelaw.hoard.util.Buffers;
 import static me.lwhitelaw.hoard.Format.*;
 
