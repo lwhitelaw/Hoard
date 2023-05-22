@@ -112,6 +112,7 @@ public class PackfileReader implements Repository {
 		long filePosition = startOfDataArea + entry.getPayloadIndex();
 		// Allocate buffer and read encoded data
 		ByteBuffer encoded = ByteBuffer.allocate(entry.getEncodedLength());
+		file.position(filePosition);
 		Buffers.readFully(file, encoded);
 		if (encoded.hasRemaining()) throw new IOException("Unexpected end of file");
 		encoded.flip(); // filling -> draining
