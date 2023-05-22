@@ -6,7 +6,9 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.zip.DataFormatException;
 
+import me.lwhitelaw.hoard.RepositoryException.Reason;
 import me.lwhitelaw.hoard.util.Buffers;
 import static me.lwhitelaw.hoard.Format.*;
 
@@ -90,6 +92,47 @@ public class PackfileReader implements Repository {
 			return PackfileEntry.fromBuffer(ebuf);
 		} catch (IllegalArgumentException ex) {
 			throw new IOException(ex.getMessage());
+		}
+	}
+	
+	public ByteBuffer readPackfileEntryPayload(PackfileEntry entry) throws IOException {
+		// Calculate position into the file based on the packfile index
+		// Calculate data area start - this will not overflow
+		long startOfDataArea = (long)ENTRY_SIZE * (long)blocktableLength + (long)HEADER_SIZE;
+		// Check if file position calculation would overflow and balk if it would
+		// This should not happen, but might as well check
+		if (Long.MAX_VALUE - startOfDataArea < entry.getPayloadIndex()) {
+			// Logic here: check the "headroom" from operand 1 before the max positive value is reached
+			// if the value to be added is larger than the headroom, overflow can be concluded
+			
+			// Overflow detected!
+			throw new IOException("Payload index would overflow long");
+		}
+		// Calculate file position
+		long filePosition = startOfDataArea + entry.getPayloadIndex();
+		// Allocate buffer and read encoded data
+		ByteBuffer encoded = ByteBuffer.allocate(entry.getEncodedLength());
+		Buffers.readFully(file, encoded);
+		if (encoded.hasRemaining()) throw new IOException("Unexpected end of file");
+		encoded.flip(); // filling -> draining
+		// Check entry encoding type to determine what to do with the data
+		if (entry.getEncoding() == RAW_ENCODING) {
+			// Raw encoding. Return as-is.
+			return encoded;
+		} else if (entry.getEncoding() == ZLIB_ENCODING) {
+			// ZLIB-compressed data encoding. Decompress the encoded data and return that.
+			ByteBuffer decompressed = ByteBuffer.allocate(entry.getLength()).order(ByteOrder.BIG_ENDIAN);
+			try {
+				Compression.decompress(encoded, decompressed);
+			} catch (DataFormatException ex) {
+				// data was malformed! treat it as an error
+				throw new IOException("zlib decompression problem");
+			}
+			decompressed.flip(); // filling -> draining
+			return decompressed;
+		} else {
+			// the encoding type is not recognised
+			throw new IOException("encoding type unknown: " + PackfileEntry.encodingToString(entry.getEncoding()));
 		}
 	}
 }

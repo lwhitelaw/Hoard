@@ -55,47 +55,5 @@ public class Format {
 	public static final long ZLIB_ENCODING = 0x00000000_5A4C4942L; // "\x00\x00\x00\x00ZLIB", zlib encoded payload
 	
 	// Utilities
-	/**
-	 * Check the header for a valid magic value and return the blocktable length.
-	 * @param channel the file to read from.
-	 * @return the length of the block table
-	 * @throws IOException if there are problems reading the file, if the magic value is not correct, or if the block table length is invalid
-	 */
-	public static int checkHeader(FileChannel channel) throws IOException {
-		ByteBuffer hbuf = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
-		channel.position(HEADER_OFFS_MAGIC);
-		Buffers.readFully(channel, hbuf);
-		// check EOF
-		if (hbuf.hasRemaining()) throw new IOException("Unexpected end of file");
-		// check magic is valid
-		if (hbuf.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) throw new IOException("Incorrect magic value");
-		// extract and check blocktable length
-		int length = hbuf.getInt(HEADER_OFFS_BLOCKTABLE_LENGTH);
-		if (length < 0) throw new IOException("Blocktable length is invalid: " + length);
-		return length;
-	}
 	
-	/**
-	 * Get the entry in the block table at the specified index. <b>No bounds-checking is performed.</b>
-	 * @param channel the file to read from.
-	 * @param index the index into the block table to read
-	 * @return the block table entry
-	 * @throws IOException if there are problems reading the file or if the entry is malformed
-	 */
-	public static PackfileEntry getBlocktableEntry(FileChannel channel, int index) throws IOException {
-		ByteBuffer ebuf = ByteBuffer.allocate(ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
-		long filePosition = (long)ENTRY_SIZE * (long)index + (long)HEADER_SIZE;
-		channel.position(filePosition);
-		Buffers.readFully(channel, ebuf);
-		// check EOF
-		if (ebuf.hasRemaining()) throw new IOException("Unexpected end of file");
-		// create object
-		// PackfileEntry will do its own checks
-		try {
-			ebuf.flip();
-			return PackfileEntry.fromBuffer(ebuf);
-		} catch (IllegalArgumentException ex) {
-			throw new IOException(ex.getMessage());
-		}
-	}
 }

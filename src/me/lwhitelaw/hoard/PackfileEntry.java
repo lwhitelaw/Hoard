@@ -100,7 +100,7 @@ public class PackfileEntry {
 		return String.format("{%s,'%s',%d (encoded: %d), index: %016X}", Hashes.hashToString(hash),encodingToString(encoding),length,encodedLength,payloadIndex);
 	}
 	
-	public String encodingToString(long encoding) {
+	public static String encodingToString(long encoding) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 7; i >= 0; i--) {
 			int targetByte = ((int)(encoding >>> (8*i))) & 0xFF;

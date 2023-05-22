@@ -11,7 +11,7 @@ import me.lwhitelaw.hoard.util.Buffers;
  * Compression utilities.
  *
  */
-class Compression {
+public class Compression {
 	private Compression() {}
 	
 	/**
@@ -23,7 +23,7 @@ class Compression {
 	 * @param threshold percentage of bytes that must be successfully predicted to declare compressibility
 	 * @return true if the input is likely compressible
 	 */
-	static boolean isLikelyCompressible(ByteBuffer buf, float threshold) {
+	public static boolean isLikelyCompressible(ByteBuffer buf, float threshold) {
 		if (!buf.hasRemaining()) return false;
 		byte[] order1 = new byte[256]; // contains the last byte seen when the previous byte was a given value
 		byte context = 0x0; // last byte seen
@@ -55,7 +55,7 @@ class Compression {
 	 * @param output output buffer for compressed data
 	 * @return true on success, false on failure due to lack of space or expansion.
 	 */
-	private static boolean compress(int level, ByteBuffer input, ByteBuffer output) {
+	public static boolean compress(int level, ByteBuffer input, ByteBuffer output) {
 		int inputSize = input.remaining();
 		int outputStart = output.position();
 		Deflater deflater = new Deflater(level);
@@ -131,7 +131,7 @@ class Compression {
 	 * @return true on success, false on failure due to lack of space.
 	 * @throws DataFormatException if the input data is malformed
 	 */
-	private static boolean decompress(ByteBuffer input, ByteBuffer output) throws DataFormatException {
+	public static boolean decompress(ByteBuffer input, ByteBuffer output) throws DataFormatException {
 		Inflater inflater = new Inflater();
 		try {
 			inflater.setInput(input);
