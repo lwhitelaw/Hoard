@@ -9,16 +9,17 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeMap;
 
 import me.lwhitelaw.hoard.util.Buffers;
 
 public final class PackfileWriter implements Repository {
-	private final List<PackfileEntry> entries;
+	private final TreeMap<BoxedHash,PackfileEntry> entries;
 	private final ByteBuffer dataArea;
 	
 	public PackfileWriter(int dataAreaSize) {
 		dataArea = ByteBuffer.allocate(dataAreaSize);
-		entries = new ArrayList<>();
+		entries = new TreeMap<>();
 	}
 	
 	/**
@@ -56,9 +57,10 @@ public final class PackfileWriter implements Repository {
 		}
 		// Hash data
 		byte[] hash = Hashes.doHash(input.duplicate());
+		BoxedHash boxed = BoxedHash.valueOf(hash);
 		// Check if data exists, if so, do not write it.
 		// O(n) operation. This could be enhanced.
-		if (entries.stream().anyMatch(entry -> Hashes.compare(hash, entry.getHash()) == 0)) {
+		if (entries.containsKey(boxed)) {
 			return hash;
 		}
 		// Get relevant data for the block table entry
@@ -71,7 +73,8 @@ public final class PackfileWriter implements Repository {
 		// Calculate encoded length from the current data area position and the payload index
 		int encodedLength = dataArea.position() - payloadIndex;
 		// Make block table entry and add it to the list
-		entries.add(new PackfileEntry(hash, encoding, length, encodedLength, payloadIndex & 0x7FFFFFFFL));
+		entries.put(boxed, new PackfileEntry(hash, encoding, length, encodedLength, payloadIndex & 0x7FFFFFFFL));
+//		entries.add(new PackfileEntry(hash, encoding, length, encodedLength, payloadIndex & 0x7FFFFFFFL));
 		return hash;
 	}
 
@@ -92,7 +95,7 @@ public final class PackfileWriter implements Repository {
 	
 	public void write(Path path) throws IOException {
 		// Sort the list by ascending hash order
-		entries.sort((a,b) -> Hashes.compare(a.getHash(), b.getHash()));
+//		entries.sort((a,b) -> Hashes.compare(a.getHash(), b.getHash()));
 		// Open file
 		FileChannel file = FileChannel.open(path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
 		// Write out header
@@ -103,7 +106,7 @@ public final class PackfileWriter implements Repository {
 		Buffers.writeFully(file, hbuf);
 		// Write out the block table entries
 		ByteBuffer ebuf = ByteBuffer.allocate(Format.ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
-		for (PackfileEntry entry : entries) {
+		for (PackfileEntry entry : entries.values()) {
 			ebuf.clear();
 			entry.toBuffer(ebuf);
 			ebuf.flip();
