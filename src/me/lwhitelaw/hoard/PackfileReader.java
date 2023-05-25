@@ -24,7 +24,7 @@ public class PackfileReader {
 		try {
 			PackfileEntry entry = locateEntryForHash(hash);
 			if (entry == null) return null;
-			return readPackfileEntryPayload(entry);
+			return readPackfileEntryPayload(entry,false);
 		} catch (IOException ex) {
 			throw new RepositoryException(ex);
 		}
@@ -83,12 +83,13 @@ public class PackfileReader {
 	}
 	
 	/**
-	 * Read the payload for a packfile entry.
+	 * Read the payload for a packfile entry, decoding as needed. If doNotDecode is true, then the data will be returned as-is.
 	 * @param entry the entry to read
+	 * @param doNotDecode if true, do not decode the payload
 	 * @return the decoded payload data
 	 * @throws IOException if reading is not possible
 	 */
-	public ByteBuffer readPackfileEntryPayload(PackfileEntry entry) throws IOException {
+	public ByteBuffer readPackfileEntryPayload(PackfileEntry entry, boolean doNotDecode) throws IOException {
 		// Calculate position into the file based on the packfile index
 		// Calculate data area start - this will not overflow
 		long startOfDataArea = (long)ENTRY_SIZE * (long)blocktableLength + (long)HEADER_SIZE;
@@ -110,8 +111,8 @@ public class PackfileReader {
 		if (encoded.hasRemaining()) throw new IOException("Unexpected end of file");
 		encoded.flip(); // filling -> draining
 		// Check entry encoding type to determine what to do with the data
-		if (entry.getEncoding() == RAW_ENCODING) {
-			// Raw encoding. Return as-is.
+		if (doNotDecode || entry.getEncoding() == RAW_ENCODING) {
+			// Raw encoding, or the user requested that data not be decoded. Return as-is.
 			return encoded;
 		} else if (entry.getEncoding() == ZLIB_ENCODING) {
 			// ZLIB-compressed data encoding. Decompress the encoded data and return that.
