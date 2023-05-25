@@ -11,7 +11,7 @@ import java.util.zip.DataFormatException;
 import me.lwhitelaw.hoard.util.Buffers;
 import static me.lwhitelaw.hoard.Format.*;
 
-public class PackfileReader implements Repository {
+public class PackfileReader {
 	private final FileChannel file;
 	private final int blocktableLength;
 	
@@ -19,18 +19,7 @@ public class PackfileReader implements Repository {
 		file = FileChannel.open(filePath, StandardOpenOption.READ);
 		blocktableLength = checkHeader();
 	}
-
-	@Override
-	public int hashSize() {
-		return 32;
-	}
-
-	@Override
-	public byte[] writeBlock(ByteBuffer data) {
-		throw new RecoverableRepositoryException("Read-only", null);
-	}
-
-	@Override
+	
 	public ByteBuffer readBlock(byte[] hash) {
 		try {
 			PackfileEntry entry = locateEntryForHash(hash);
@@ -40,19 +29,13 @@ public class PackfileReader implements Repository {
 			throw new RepositoryException(ex);
 		}
 	}
-
-	@Override
+	
 	public void close() {
 		try {
 			file.close();
 		} catch (IOException ex) {
 			throw new RecoverableRepositoryException("I/O error on close; this seems rather unlikely", ex);
 		}
-	}
-
-	@Override
-	public void sync() {
-		
 	}
 	
 	// Utilities

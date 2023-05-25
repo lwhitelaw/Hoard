@@ -11,7 +11,7 @@ import java.util.TreeMap;
 
 import me.lwhitelaw.hoard.util.Buffers;
 
-public final class PackfileWriter implements Repository {
+public final class PackfileWriter {
 	private final TreeMap<BoxedHash,PackfileEntry> entries; // Keyed on hash, values are packfile entries to be inserted
 	private final ByteBuffer dataArea;
 	
@@ -27,11 +27,6 @@ public final class PackfileWriter implements Repository {
 		entries.clear();
 		dataArea.clear();
 	}
-
-	@Override
-	public int hashSize() {
-		return 32;
-	}
 	
 	/**
 	 * Return the amount of bytes that can be provided to the packfile writer before the data area buffer is full.
@@ -46,7 +41,6 @@ public final class PackfileWriter implements Repository {
 	 * There must be enough remaining capacity to write the entire input, even if the input is compressed
 	 * to a smaller size.
 	 */
-	@Override
 	public byte[] writeBlock(ByteBuffer input) {
 		// Check if there's enough room to copy input
 		if (input.remaining() > dataArea.remaining()) {
@@ -73,21 +67,6 @@ public final class PackfileWriter implements Repository {
 		// Make block table entry and add it to the tree using the boxed hash key
 		entries.put(boxed, new PackfileEntry(hash, encoding, length, encodedLength, payloadIndex & 0x7FFFFFFFL));
 		return hash;
-	}
-
-	@Override
-	public ByteBuffer readBlock(byte[] hash) {
-		return null;
-	}
-
-	@Override
-	public void close() {
-		
-	}
-
-	@Override
-	public void sync() {
-		
 	}
 	
 	public void write(Path path) throws IOException {
