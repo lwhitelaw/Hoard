@@ -94,13 +94,13 @@ public final class PackfileWriter implements Repository {
 		// Open file
 		FileChannel file = FileChannel.open(path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
 		// Write out header
-		ByteBuffer hbuf = ByteBuffer.allocate(Format.HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer hbuf = ByteBuffer.allocateDirect(Format.HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
 		hbuf.putLong(Format.HEADER_MAGIC);
 		hbuf.putInt(entries.size());
 		hbuf.flip(); // buf fill -> drain
 		Buffers.writeFully(file, hbuf);
 		// Write out the block table entries by traversing tree values in ascending order
-		ByteBuffer ebuf = ByteBuffer.allocate(Format.ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer ebuf = ByteBuffer.allocateDirect(Format.ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
 		for (PackfileEntry entry : entries.values()) {
 			ebuf.clear();
 			entry.toBuffer(ebuf);
