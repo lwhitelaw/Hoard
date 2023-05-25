@@ -2,6 +2,7 @@ package me.lwhitelaw.hoard.util;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
@@ -68,6 +69,43 @@ public class Buffers {
 		int bytes = 0;
 		while (buf.hasRemaining()) {
 			int readResult = chan.read(buf);
+			if (readResult == -1) {
+				return bytes;
+			}
+			bytes += readResult;
+		}
+		return bytes;
+	}
+	
+	/**
+	 * Fully write this buffer to the file at the given position, repeating until the buffer is drained.
+	 * @param file File channel to write to
+	 * @param buf Buffer to drain
+	 * @param startLocation where in the file to start writing
+	 * @return the number of bytes written, which will be the number of bytes remaining
+	 * @throws IOException if an I/O error occurs
+	 */
+	public static int writeFileFully(FileChannel file, ByteBuffer buf, long startLocation) throws IOException {
+		int bytes = 0;
+		while (buf.hasRemaining()) {
+			bytes += file.write(buf,startLocation + bytes);
+		}
+		return bytes;
+	}
+	
+	/**
+	 * Fully read data into this buffer from the file at the given position, repeating until the buffer is
+	 * filled or end of stream is signalled.
+	 * @param file File channel to read from
+	 * @param buf Buffer to fill
+	 * @param startLocation where in the file to start reading
+	 * @return the number of bytes read
+	 * @throws IOException if an I/O error occurs
+	 */
+	public static int readFileFully(FileChannel file, ByteBuffer buf, long startLocation) throws IOException {
+		int bytes = 0;
+		while (buf.hasRemaining()) {
+			int readResult = file.read(buf,startLocation + bytes);
 			if (readResult == -1) {
 				return bytes;
 			}
