@@ -113,4 +113,18 @@ public class Buffers {
 		}
 		return bytes;
 	}
+	
+	/**
+	 * Move data from the given location with the given size to the end of the file.
+	 * @param file The file to operate on
+	 * @param start The starting position of the data to move
+	 * @param size The amount of data to move
+	 * @return the absolute position where the new data starts
+	 * @throws IOException if an I/O error occurs
+	 */
+	public static long moveDataToEndOfFile(FileChannel file, long start, long size) throws IOException {
+		final long endOfFile = file.size();
+		
+		return endOfFile;
+	}
 }
