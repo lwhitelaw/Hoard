@@ -64,8 +64,8 @@ public class PackfileReader implements Repository {
 	 */
 	public int checkHeader() throws IOException {
 		ByteBuffer hbuf = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
-		file.position(HEADER_OFFS_MAGIC);
-		Buffers.readFully(file, hbuf);
+//		file.position(HEADER_OFFS_MAGIC);
+		Buffers.readFileFully(file, hbuf, HEADER_OFFS_MAGIC);
 		// check EOF
 		if (hbuf.hasRemaining()) throw new IOException("Unexpected end of file");
 		// check magic is valid
@@ -85,8 +85,8 @@ public class PackfileReader implements Repository {
 	public PackfileEntry getBlocktableEntry(int index) throws IOException {
 		ByteBuffer ebuf = ByteBuffer.allocate(ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
 		long filePosition = (long)ENTRY_SIZE * (long)index + (long)HEADER_SIZE;
-		file.position(filePosition);
-		Buffers.readFully(file, ebuf);
+//		file.position(filePosition);
+		Buffers.readFileFully(file, ebuf, filePosition);
 		// check EOF
 		if (ebuf.hasRemaining()) throw new IOException("Unexpected end of file");
 		// create object
@@ -122,8 +122,8 @@ public class PackfileReader implements Repository {
 		long filePosition = startOfDataArea + entry.getPayloadIndex();
 		// Allocate buffer and read encoded data
 		ByteBuffer encoded = ByteBuffer.allocate(entry.getEncodedLength());
-		file.position(filePosition);
-		Buffers.readFully(file, encoded);
+//		file.position(filePosition);
+		Buffers.readFileFully(file, encoded, filePosition);
 		if (encoded.hasRemaining()) throw new IOException("Unexpected end of file");
 		encoded.flip(); // filling -> draining
 		// Check entry encoding type to determine what to do with the data
