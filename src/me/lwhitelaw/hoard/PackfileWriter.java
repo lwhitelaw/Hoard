@@ -16,7 +16,7 @@ public final class PackfileWriter implements Repository {
 	private final ByteBuffer dataArea;
 	
 	public PackfileWriter(int dataAreaSize) {
-		dataArea = ByteBuffer.allocate(dataAreaSize);
+		dataArea = ByteBuffer.allocateDirect(dataAreaSize);
 		entries = new TreeMap<>();
 	}
 	

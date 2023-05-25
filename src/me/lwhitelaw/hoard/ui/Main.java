@@ -288,7 +288,7 @@ public class Main {
 //			return null; // never happens but keeps javac happy
 //		}
 		if (writable) {
-			return new PackfileWriter(Integer.MAX_VALUE-16);
+			return new PackfileWriter(Integer.MAX_VALUE);
 		} else {
 			try {
 				return new PackfileReader(repopath);
