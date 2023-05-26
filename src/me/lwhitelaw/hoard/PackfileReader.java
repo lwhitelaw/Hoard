@@ -34,7 +34,7 @@ public class PackfileReader {
 		try {
 			file.close();
 		} catch (IOException ex) {
-			throw new RecoverableRepositoryException("I/O error on close; this seems rather unlikely", ex);
+			throw new RuntimeException("I/O error on close; this seems rather unlikely", ex);
 		}
 	}
 	
