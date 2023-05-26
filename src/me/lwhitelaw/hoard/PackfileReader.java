@@ -26,7 +26,7 @@ public class PackfileReader {
 			if (entry == null) return null;
 			return readPackfileEntryPayload(entry,false);
 		} catch (IOException ex) {
-			throw new RepositoryException(ex);
+			return null;
 		}
 	}
 	
