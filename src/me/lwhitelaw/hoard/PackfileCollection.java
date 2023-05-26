@@ -16,6 +16,10 @@ public class PackfileCollection {
 		openPackfiles = new ArrayList<>();
 	}
 	
+	/**
+	 * Add the provided packfile reader.
+	 * @param reader Opened packfile to add
+	 */
 	public void addPackfile(PackfileReader reader) {
 		openPackfiles.add(reader);
 	}
@@ -61,11 +65,65 @@ public class PackfileCollection {
 	}
 	
 	/**
+	 * Return true if any of the packfiles contains the block referenced by the provided hash.
+	 * @param hash The hash to check
+	 * @return true if the block exists
+	 * @throws IOException if an I/O error occurs
+	 */
+	public boolean checkExists(byte[] hash) throws IOException {
+		for (PackfileReader packfile : openPackfiles) {
+			PackfileEntry entry = packfile.locateEntryForHash(hash);
+			if (entry != null) return true;
+		}
+		return false;
+	}
+	
+	/**
 	 * Close all open packfiles added to this collection.
 	 */
 	public void close() {
 		for (PackfileReader packfile : openPackfiles) {
 			packfile.close();
+		}
+	}
+	
+	/**
+	 * Generate a path of the form "pack????.hdb", where ???? is the first unused integer starting from 0000. Further digits will be added as needed.
+	 * @param folder the folder to generate a path in
+	 * @return a path unused by any file
+	 */
+	public static Path generatePackfilePath(Path folder) {
+		if (!Files.isDirectory(folder)) throw new IllegalArgumentException("provided path is not a folder");
+		int pack = 0;
+		Path path = folder.resolve(String.format("pack%04d.hdb",pack));
+		while (!Files.notExists(path)) {
+			pack++;
+			path = folder.resolve(String.format("pack%04d.hdb",pack));
+		}
+		return path;
+	}
+	
+	public byte[] writeBlockIntoPackfileSeries(PackfileWriter writer, Path folder, ByteBuffer buffer) throws IOException {
+		// Check if the block already exists.
+		// (This is unfortunately inefficient: a write forces two sha3 hashes)
+		byte[] hash = Hashes.doHash(buffer.duplicate());
+		if (checkExists(hash)) return hash;
+		// Check if there is sufficient room to write.
+		if (writer.remainingCapacity() < buffer.remaining()) {
+			// Not enough room. Write to folder and reset writer.
+			writer.write(generatePackfilePath(folder));
+			writer.reset();
+		}
+		// Check again to see if there's enough room.
+		if (writer.remainingCapacity() < buffer.remaining()) {
+			// Not enough room. Create new packfile writer just for this block.
+			PackfileWriter largeObjectWriter = new PackfileWriter(buffer.remaining());
+			byte[] writerHash = largeObjectWriter.writeBlock(buffer);
+			largeObjectWriter.write(generatePackfilePath(folder));
+			return writerHash;
+		} else {
+			// There is enough room, so write the block.
+			return writer.writeBlock(buffer);
 		}
 	}
 }
