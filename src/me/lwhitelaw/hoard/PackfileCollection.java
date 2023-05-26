@@ -105,7 +105,7 @@ public class PackfileCollection {
 	
 	public byte[] writeBlockIntoPackfileSeries(PackfileWriter writer, Path folder, ByteBuffer buffer) throws IOException {
 		// Check if the block already exists.
-		// (This is unfortunately inefficient: a write forces two sha3 hashes)
+		// The precalculated hash can be saved in case the block needs to be written.
 		byte[] hash = Hashes.doHash(buffer.duplicate());
 		if (checkExists(hash)) return hash;
 		// Check if there is sufficient room to write.
@@ -118,12 +118,18 @@ public class PackfileCollection {
 		if (writer.remainingCapacity() < buffer.remaining()) {
 			// Not enough room. Create new packfile writer just for this block.
 			PackfileWriter largeObjectWriter = new PackfileWriter(buffer.remaining());
-			byte[] writerHash = largeObjectWriter.writeBlock(buffer);
+			largeObjectWriter.writeBlockUnsafe(buffer,hash);
 			largeObjectWriter.write(generatePackfilePath(folder));
-			return writerHash;
+			return hash;
 		} else {
 			// There is enough room, so write the block.
-			return writer.writeBlock(buffer);
+			return writer.writeBlockUnsafe(buffer,hash);
 		}
+	}
+	
+	public void finishPackfileSeries(PackfileWriter writer, Path folder) throws IOException {
+		if (writer.isEmpty()) return;
+		writer.write(generatePackfilePath(folder));
+		writer.reset();
 	}
 }
