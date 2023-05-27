@@ -8,6 +8,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
+import me.lwhitelaw.hoard.PackfileWriter;
 import me.lwhitelaw.hoard.RecoverableRepositoryException;
 import me.lwhitelaw.hoard.Repository;
 
@@ -28,7 +29,7 @@ public class SuperblockOutputStream extends OutputStream {
 	// once stream is finished, lower levels have their blocks combined into upper levels
 	// until reaching the top
 	
-	private final Repository repo; // the repository to which all blocks are written
+	private final PackfileWriter repo; // the repository to which all blocks are written
 	private final ByteBuffer[] currentSuperblocks; // buffers for up to 24 levels of superblocks yet to be written
 	private final ByteBuffer currentBlock; // buffer for the current leaf block yet to be written
 	private byte[] finalHash; // hash root of the superblock tree; null while the stream isn't closed
@@ -56,7 +57,7 @@ public class SuperblockOutputStream extends OutputStream {
 	 * That ought to be practically infinite for all intents and purposes.
 	 */
 	
-	public SuperblockOutputStream(Repository repo) {
+	public SuperblockOutputStream(PackfileWriter repo) {
 		this.repo = repo;
 		currentBlock = ByteBuffer.allocate(65535).order(ByteOrder.BIG_ENDIAN);
 		currentSuperblocks = new ByteBuffer[MAX_LEVELS];

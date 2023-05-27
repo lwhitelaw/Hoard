@@ -7,11 +7,12 @@ import java.nio.ByteOrder;
 import java.util.ArrayDeque;
 
 import me.lwhitelaw.hoard.Hashes;
+import me.lwhitelaw.hoard.PackfileCollection;
 import me.lwhitelaw.hoard.RecoverableRepositoryException;
 import me.lwhitelaw.hoard.Repository;
 
 public class SuperblockInputStream extends InputStream {
-	private final Repository repo; // the repository from which blocks are read
+	private final PackfileCollection repo; // the repository from which blocks are read
 	private final byte[] startingHash; // the original hash from which data is read
 	private final ArrayDeque<ByteBuffer> currentSuperblocks; // stack of superblock buffers yet to be handled
 	private ByteBuffer currentBlock; // buffer for the current leaf block to be read from
@@ -27,7 +28,7 @@ public class SuperblockInputStream extends InputStream {
 	// Magic values
 	private static final long HEADER_MAGIC = 0x5355504552424C4BL; // "SUPERBLK", magic for all superblocks
 
-	public SuperblockInputStream(Repository repo, byte[] hash) {
+	public SuperblockInputStream(PackfileCollection repo, byte[] hash) {
 		this.repo = repo;
 		startingHash = new byte[hash.length];
 		System.arraycopy(hash, 0, startingHash, 0, startingHash.length);

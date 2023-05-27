@@ -75,6 +75,6 @@ public class Format {
 	public static long roundUp64(long n) {
 		final long MASK64 = 0x3F;
 		if ((n & MASK64) == 0) return n;
-		return (n & MASK64) + 64;
+		return (n & ~MASK64) + 64;
 	}
 }

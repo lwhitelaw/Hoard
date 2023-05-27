@@ -116,10 +116,22 @@ public final class PackfileWriter {
 		FileChannel file = FileChannel.open(path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
 		// Write out header
 		ByteBuffer hbuf = ByteBuffer.allocateDirect(Format.HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
-		hbuf.putLong(Format.HEADER_MAGIC);
-		hbuf.putInt(entries.size());
+		hbuf.putLong(Format.HEADER_MAGIC); // Magic value
+		hbuf.putLong(0xFFFFFFFF_FFFFFFFFL); // Placeholder for blocktable start
+		hbuf.putInt(entries.size()); // Number of blocktable entries
+		while (hbuf.hasRemaining()) hbuf.put((byte) 0); // Reserved
 		hbuf.flip(); // buf fill -> drain
 		Buffers.writeFully(file, hbuf);
+		// Write out the data area
+		dataArea.flip();
+		Buffers.writeFully(file, dataArea);
+		// Write out padding
+		padTo64Bytes(file);
+		// Fix up blocktable start
+		ByteBuffer bsbuf = ByteBuffer.allocateDirect(Long.BYTES).order(ByteOrder.BIG_ENDIAN);
+		bsbuf.putLong(file.position());
+		bsbuf.flip(); // buf fill -> drain
+		Buffers.writeFileFully(file, bsbuf, Format.HEADER_OFFS_BLOCKTABLE_START);
 		// Write out the block table entries by traversing tree values in ascending order
 		ByteBuffer ebuf = ByteBuffer.allocateDirect(Format.ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
 		for (PackfileEntry entry : entries.values()) {
@@ -128,10 +140,19 @@ public final class PackfileWriter {
 			ebuf.flip();
 			Buffers.writeFully(file, ebuf);
 		}
-		// Write out the data area
-		dataArea.flip();
-		Buffers.writeFully(file, dataArea);
 		// Close file
 		file.close();
+	}
+	
+	public void padTo64Bytes(FileChannel channel) throws IOException {
+		ByteBuffer buf = ByteBuffer.allocate(64).order(ByteOrder.BIG_ENDIAN);
+		long neededPadding = Format.roundUp64(channel.size()) - channel.size();
+		System.out.println("At " + channel.size() + ", writing " + neededPadding);
+		while (neededPadding > 0) {
+			buf.put((byte) 0);
+			neededPadding--;
+		}
+		buf.flip();
+		Buffers.writeFully(channel, buf);
 	}
 }

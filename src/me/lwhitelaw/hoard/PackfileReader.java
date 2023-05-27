@@ -13,11 +13,30 @@ import static me.lwhitelaw.hoard.Format.*;
 
 public class PackfileReader {
 	private final FileChannel file;
+	private final long blocktableStart;
 	private final int blocktableLength;
 	
 	public PackfileReader(Path filePath) throws IOException {
 		file = FileChannel.open(filePath, StandardOpenOption.READ);
-		blocktableLength = checkHeader();
+		// Check header and initialise locations
+		{
+			ByteBuffer hbuf = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
+			Buffers.readFileFully(file, hbuf, HEADER_OFFS_MAGIC);
+			// check EOF
+			if (hbuf.hasRemaining()) throw new IOException("Unexpected end of file");
+			// check magic is valid
+			if (hbuf.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) throw new IOException("Incorrect magic value");
+			// extract and check blocktable length
+			blocktableLength = hbuf.getInt(HEADER_OFFS_BLOCKTABLE_LENGTH);
+			if (blocktableLength < 0) throw new IOException("Blocktable length is invalid: " + blocktableLength);
+			// extract and check blocktable start
+			blocktableStart = hbuf.getLong(HEADER_OFFS_BLOCKTABLE_START);
+			if (blocktableStart < 0) throw new IOException("Blocktable start is invalid: " + blocktableStart);
+			// check that start + length * 64 equals the end of file
+			if ((blocktableStart + (blocktableLength * ENTRY_SIZE)) != file.size()) {
+				throw new IOException("The end of the blocktable does not end the file");
+			}
+		}
 	}
 	
 	public ByteBuffer readBlock(byte[] hash) {
@@ -40,23 +59,12 @@ public class PackfileReader {
 	
 	// Utilities
 	
-	/**
-	 * Check the header for a valid magic value and return the blocktable length.
-	 * @return the length of the block table
-	 * @throws IOException if there are problems reading the file, if the magic value is not correct, or if the block table length is invalid
-	 */
-	public int checkHeader() throws IOException {
-		ByteBuffer hbuf = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
-//		file.position(HEADER_OFFS_MAGIC);
-		Buffers.readFileFully(file, hbuf, HEADER_OFFS_MAGIC);
-		// check EOF
-		if (hbuf.hasRemaining()) throw new IOException("Unexpected end of file");
-		// check magic is valid
-		if (hbuf.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) throw new IOException("Incorrect magic value");
-		// extract and check blocktable length
-		int length = hbuf.getInt(HEADER_OFFS_BLOCKTABLE_LENGTH);
-		if (length < 0) throw new IOException("Blocktable length is invalid: " + length);
-		return length;
+	public int getBlocktableLength() {
+		return blocktableLength;
+	}
+	
+	public long getBlocktableStart() {
+		return blocktableStart;
 	}
 	
 	/**
@@ -67,7 +75,7 @@ public class PackfileReader {
 	 */
 	public PackfileEntry getBlocktableEntry(int index) throws IOException {
 		ByteBuffer ebuf = ByteBuffer.allocate(ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
-		long filePosition = (long)ENTRY_SIZE * (long)index + (long)HEADER_SIZE;
+		long filePosition = (long)ENTRY_SIZE * (long)index + (long)blocktableStart;
 //		file.position(filePosition);
 		Buffers.readFileFully(file, ebuf, filePosition);
 		// check EOF
@@ -91,19 +99,15 @@ public class PackfileReader {
 	 */
 	public ByteBuffer readPackfileEntryPayload(PackfileEntry entry, boolean doNotDecode) throws IOException {
 		// Calculate position into the file based on the packfile index
-		// Calculate data area start - this will not overflow
-		long startOfDataArea = (long)ENTRY_SIZE * (long)blocktableLength + (long)HEADER_SIZE;
-		// Check if file position calculation would overflow and balk if it would
-		// This should not happen, but might as well check
-		if (Long.MAX_VALUE - startOfDataArea < entry.getPayloadIndex()) {
-			// Logic here: check the "headroom" from operand 1 before the max positive value is reached
-			// if the value to be added is larger than the headroom, overflow can be concluded
-			
-			// Overflow detected!
-			throw new IOException("Payload index would overflow long");
-		}
+		long startOfDataArea = DATA_AREA_OFFS_START;
 		// Calculate file position
 		long filePosition = startOfDataArea + entry.getPayloadIndex();
+		// Check if payload index makes sense
+		// This should not be a problem, but might as well check
+		if (filePosition + entry.getEncodedLength() > blocktableStart) {
+			// Overflow detected!
+			throw new IOException("Payload index would overflow data area");
+		}
 		// Allocate buffer and read encoded data
 		ByteBuffer encoded = ByteBuffer.allocate(entry.getEncodedLength());
 //		file.position(filePosition);

@@ -11,6 +11,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import me.lwhitelaw.hoard.Hashes;
+import me.lwhitelaw.hoard.PackfileCollection;
 import me.lwhitelaw.hoard.PackfileReader;
 import me.lwhitelaw.hoard.PackfileWriter;
 import me.lwhitelaw.hoard.Repository;
@@ -91,13 +92,14 @@ public class Main {
 			Path blockpath = validatePath(filename); // where to source the block data
 			validateFile(blockpath,true);
 			// Initialise repo
-			Repository repo = getRepository(repopath,true);
+			PackfileWriter repo = getWriter(repopath);
 			
 			int exitcode = 0;
 			try {
 				// Read file and write to repo
 				ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(blockpath));
 				byte[] hash = repo.writeBlock(buffer);
+				repo.write(repopath);
 				System.out.println(Hashes.hashToString(hash));
 			} catch (IOException ex) {
 				System.err.println("ERROR: I/O error");
@@ -106,12 +108,12 @@ public class Main {
 				System.err.println("ERROR: repository write failed: " + ex.getReason());
 				exitcode = 255;
 			} finally {
-				try {
-					repo.close();
-				} catch (RepositoryException ex) {
-					System.err.println("ERROR: repository failed to close: " + ex.getReason());
-					exitcode = 255;
-				}
+//				try {
+//					repo.close();
+//				} catch (RepositoryException ex) {
+//					System.err.println("ERROR: repository failed to close: " + ex.getReason());
+//					exitcode = 255;
+//				}
 			}
 			System.exit(exitcode);
 			return;
@@ -129,7 +131,7 @@ public class Main {
 			Path blockpath = validatePath(filename); // where to source the block data
 			validateFile(blockpath,false);
 			// Initialise repo
-			Repository repo = getRepository(repopath,true);
+			PackfileWriter repo = getWriter(repopath);
 			
 			int exitcode = 0;
 			try {
@@ -170,7 +172,7 @@ public class Main {
 					if (repo instanceof PackfileWriter) {
 						((PackfileWriter) repo).write(repopath);
 					}
-					repo.close();
+//					repo.close();
 				} catch (RepositoryException ex) {
 					System.err.println("ERROR: repository failed to close: " + ex.getReason());
 					exitcode = 255;
@@ -191,7 +193,7 @@ public class Main {
 			Path repopath = validatePath(repofile); // where repo will be stored
 			byte[] hasharray = validateHash(hash);
 			// Initialise repo
-			Repository repo = getRepository(repopath,false);
+			PackfileReader repo = getReader(repopath);
 			
 			int exitcode = 0;
 			try {
@@ -234,12 +236,14 @@ public class Main {
 			Path repopath = validatePath(repofile); // where repo will be stored
 			byte[] hasharray = validateHash(hash);
 			// Initialise repo
-			Repository repo = getRepository(repopath,false);
+			PackfileReader repo = getReader(repopath);
+			PackfileCollection coll = new PackfileCollection();
+			coll.addPackfile(repo);
 			
 			int exitcode = 0;
 			try {
 				// Read repo block and write to standard out
-				SuperblockInputStream sis = new SuperblockInputStream(repo, hasharray);
+				SuperblockInputStream sis = new SuperblockInputStream(coll, hasharray);
 				int c;
 				while ((c = sis.read()) != -1) {
 					System.out.write(c & 0xFF);
@@ -252,7 +256,7 @@ public class Main {
 				exitcode = 255;
 			} finally {
 				try {
-					repo.close();
+					coll.close();
 				} catch (RepositoryException ex) {
 					System.err.println("ERROR: repository failed to close: " + ex.getReason());
 					exitcode = 255;
@@ -268,26 +272,46 @@ public class Main {
 		}
 	}
 	
-	private static Repository getRepository(Path repopath, boolean writable) {
-		checkSHA3();
-//		try {
-//			return new FileRepository(repopath, writable);
-//		} catch (RepositoryException ex) {
-//			System.err.println("ERROR: could not open repository at " + repopath + ": " + ex.getReason());
-//			System.exit(255);
-//			return null; // never happens but keeps javac happy
+//	private static Repository getRepository(Path repopath, boolean writable) {
+//		checkSHA3();
+////		try {
+////			return new FileRepository(repopath, writable);
+////		} catch (RepositoryException ex) {
+////			System.err.println("ERROR: could not open repository at " + repopath + ": " + ex.getReason());
+////			System.exit(255);
+////			return null; // never happens but keeps javac happy
+////		}
+//		if (writable) {
+//			return new PackfileWriter(Integer.MAX_VALUE);
+//		} else {
+//			try {
+//				return new PackfileReader(repopath);
+//			} catch (IOException ex) {
+//				System.err.println("ERROR: could not open repository at " + repopath);
+//				System.exit(255);
+//				return null;
+//			}
 //		}
-		if (writable) {
-			return new PackfileWriter(Integer.MAX_VALUE);
-		} else {
-			try {
-				return new PackfileReader(repopath);
-			} catch (IOException ex) {
-				System.err.println("ERROR: could not open repository at " + repopath);
-				System.exit(255);
-				return null;
-			}
+//	}
+	
+	private static PackfileReader getReader(Path repopath) {
+		try {
+			return new PackfileReader(repopath);
+		} catch (IOException ex) {
+			System.err.println("ERROR: could not open repository at " + repopath);
+			System.exit(255);
+			return null;
 		}
+	}
+	
+	private static PackfileWriter getWriter(Path repopath) {
+//		try {
+			return new PackfileWriter(Integer.MAX_VALUE);
+//		} catch (IOException ex) {
+//			System.err.println("ERROR: could not open repository at " + repopath);
+//			System.exit(255);
+//			return null;
+//		}
 	}
 	
 	private static void checkSHA3() {
