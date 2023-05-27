@@ -103,6 +103,8 @@ public class PackfileCollection {
 		return path;
 	}
 	
+	// TODO: remove these
+	
 	public byte[] writeBlockIntoPackfileSeries(PackfileWriter writer, Path folder, ByteBuffer buffer) throws IOException {
 		// Check if the block already exists.
 		// The precalculated hash can be saved in case the block needs to be written.

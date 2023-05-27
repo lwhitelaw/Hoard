@@ -11,6 +11,8 @@ import java.util.TreeMap;
 
 import me.lwhitelaw.hoard.util.Buffers;
 
+// TODO: rewrite writer to take advantage of new format
+
 public final class PackfileWriter {
 	private final TreeMap<BoxedHash,PackfileEntry> entries; // Keyed on hash, values are packfile entries to be inserted
 	private final ByteBuffer dataArea;
