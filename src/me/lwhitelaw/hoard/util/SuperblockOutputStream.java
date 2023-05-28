@@ -67,7 +67,7 @@ public class SuperblockOutputStream extends OutputStream {
 	}
 
 	@Override
-	public void write(int b) {
+	public void write(int b) throws IOException {
 		if (finalHash != null) throw new IllegalStateException("Stream closed");
 		if (treeFull) throw new RecoverableRepositoryException("No more data can be written to this stream without truncation", null);
 		currentBlock.put((byte) b);
@@ -83,7 +83,7 @@ public class SuperblockOutputStream extends OutputStream {
 	}
 	
 	// Push the current data block into superblock level 0
-	private void pushBlock() {
+	private void pushBlock() throws IOException {
 		// Write back data block
 		currentBlock.flip(); // to drain
 		byte[] hash = repo.writeBlock(currentBlock);
@@ -95,7 +95,7 @@ public class SuperblockOutputStream extends OutputStream {
 	}
 	
 	// Handle promotions of full blocks once lower levels hit 1024
-	private void promoteFullBlocks() {
+	private void promoteFullBlocks() throws IOException {
 		int level = 0;
 		while (level < TOP_LEVEL) {
 			ByteBuffer superblock = getBlockListForLevel(level);
@@ -121,7 +121,7 @@ public class SuperblockOutputStream extends OutputStream {
 	}
 	
 	// Consolidate blocks remaining on all levels into one hash
-	private void consolidateBlocks() {
+	private void consolidateBlocks() throws IOException {
 		// if no data has been written, push an empty block forcibly, so level 0 has 1 block
 		if (!nonempty) pushBlock();
 		// walk the levels to determine what has blocks and what does not

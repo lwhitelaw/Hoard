@@ -99,7 +99,7 @@ public class Main {
 				// Read file and write to repo
 				ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(blockpath));
 				byte[] hash = repo.writeBlock(buffer);
-				repo.write(repopath);
+				repo.close();
 				System.out.println(Hashes.hashToString(hash));
 			} catch (IOException ex) {
 				System.err.println("ERROR: I/O error");
@@ -169,10 +169,7 @@ public class Main {
 				exitcode = 255;
 			} finally {
 				try {
-					if (repo instanceof PackfileWriter) {
-						((PackfileWriter) repo).write(repopath);
-					}
-//					repo.close();
+					repo.close();
 				} catch (RepositoryException ex) {
 					System.err.println("ERROR: repository failed to close: " + ex.getReason());
 					exitcode = 255;
@@ -305,13 +302,13 @@ public class Main {
 	}
 	
 	private static PackfileWriter getWriter(Path repopath) {
-//		try {
-			return new PackfileWriter(Integer.MAX_VALUE);
-//		} catch (IOException ex) {
-//			System.err.println("ERROR: could not open repository at " + repopath);
-//			System.exit(255);
-//			return null;
-//		}
+		try {
+			return new PackfileWriter(repopath);
+		} catch (IOException ex) {
+			System.err.println("ERROR: could not open repository at " + repopath);
+			System.exit(255);
+			return null;
+		}
 	}
 	
 	private static void checkSHA3() {
