@@ -54,9 +54,11 @@ public final class PackfileWriter {
 		if (entries.containsKey(boxed)) {
 			return hash;
 		}
+		// Move file pointer to the end
+		file.position(file.size());
 		// Get relevant data for the block table entry
 		int length = input.remaining(); // block length
-		long payloadIndex = file.position(); // get position where file pointer is at, since data will be written here.
+		long payloadIndex = file.position() - Format.DATA_AREA_OFFS_START; // payload offset from data area start, based on file position at the end
 		// Get compression buffer ready
 		prepareCompressionBufferWithSize(input.remaining());
 		// Try compressing
@@ -66,8 +68,7 @@ public final class PackfileWriter {
 		// Calculate encoded length from the encoded buffer
 		compressionBuffer.flip();
 		int encodedLength = compressionBuffer.remaining();
-		// Move file position to end and write out the payload
-		file.position(file.size());
+		// With file position at the end, write out the payload
 		Buffers.writeFully(file, compressionBuffer);
 		// Make block table entry and add it to the tree using the boxed hash key
 		entries.put(boxed, new PackfileEntry(hash, encoding, length, encodedLength, payloadIndex));
