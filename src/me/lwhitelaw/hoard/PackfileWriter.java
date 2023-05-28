@@ -146,7 +146,7 @@ public final class PackfileWriter {
 		if (compressionBuffer == null || compressionBuffer.capacity() < size) {
 			compressionBuffer = ByteBuffer.allocateDirect(size).order(ByteOrder.BIG_ENDIAN);
 		}
-		compressionBuffer.reset();
+		compressionBuffer.clear();
 	}
 	
 	private void writeHeader(long blocktableStart, int blocktableLength) throws IOException {
