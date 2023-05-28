@@ -102,36 +102,4 @@ public class PackfileCollection {
 		}
 		return path;
 	}
-	
-	// TODO: remove these
-	
-	public byte[] writeBlockIntoPackfileSeries(PackfileWriter writer, Path folder, ByteBuffer buffer) throws IOException {
-		// Check if the block already exists.
-		// The precalculated hash can be saved in case the block needs to be written.
-		byte[] hash = Hashes.doHash(buffer.duplicate());
-		if (checkExists(hash)) return hash;
-		// Check if there is sufficient room to write.
-		if (writer.remainingCapacity() < buffer.remaining()) {
-			// Not enough room. Write to folder and reset writer.
-			writer.write(generatePackfilePath(folder));
-			writer.reset();
-		}
-		// Check again to see if there's enough room.
-		if (writer.remainingCapacity() < buffer.remaining()) {
-			// Not enough room. Create new packfile writer just for this block.
-			PackfileWriter largeObjectWriter = new PackfileWriter(buffer.remaining());
-			largeObjectWriter.writeBlockUnsafe(buffer,hash);
-			largeObjectWriter.write(generatePackfilePath(folder));
-			return hash;
-		} else {
-			// There is enough room, so write the block.
-			return writer.writeBlockUnsafe(buffer,hash);
-		}
-	}
-	
-	public void finishPackfileSeries(PackfileWriter writer, Path folder) throws IOException {
-		if (writer.isEmpty()) return;
-		writer.write(generatePackfilePath(folder));
-		writer.reset();
-	}
 }
