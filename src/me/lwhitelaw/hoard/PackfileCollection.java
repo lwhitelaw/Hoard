@@ -55,8 +55,9 @@ public class PackfileCollection {
 	 * Every packfile in the collection will be tried until the data is returned or all fail to return any data.
 	 * @param hash The hash to read
 	 * @return the data, or null if not present in any packfile
+	 * @throws IOException if an I/O error occurs
 	 */
-	public ByteBuffer readBlock(byte[] hash) {
+	public ByteBuffer readBlock(byte[] hash) throws IOException {
 		for (PackfileReader packfile : openPackfiles) {
 			ByteBuffer block = packfile.readBlock(hash);
 			if (block != null) return block;

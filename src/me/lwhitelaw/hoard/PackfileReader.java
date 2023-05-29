@@ -39,14 +39,10 @@ public class PackfileReader {
 		}
 	}
 	
-	public ByteBuffer readBlock(byte[] hash) {
-		try {
-			PackfileEntry entry = locateEntryForHash(hash);
-			if (entry == null) return null;
-			return readPackfileEntryPayload(entry,false);
-		} catch (IOException ex) {
-			return null;
-		}
+	public ByteBuffer readBlock(byte[] hash) throws IOException {
+		PackfileEntry entry = locateEntryForHash(hash);
+		if (entry == null) return null;
+		return readPackfileEntryPayload(entry,false);
 	}
 	
 	public void close() {
