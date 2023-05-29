@@ -14,8 +14,6 @@ import me.lwhitelaw.hoard.Hashes;
 import me.lwhitelaw.hoard.PackfileCollection;
 import me.lwhitelaw.hoard.PackfileReader;
 import me.lwhitelaw.hoard.PackfileWriter;
-import me.lwhitelaw.hoard.Repository;
-import me.lwhitelaw.hoard.RepositoryException;
 import me.lwhitelaw.hoard.util.SuperblockInputStream;
 import me.lwhitelaw.hoard.util.SuperblockOutputStream;
 
@@ -104,9 +102,6 @@ public class Main {
 			} catch (IOException ex) {
 				System.err.println("ERROR: I/O error");
 				exitcode = 255;
-			} catch (RepositoryException ex) {
-				System.err.println("ERROR: repository write failed: " + ex.getReason());
-				exitcode = 255;
 			} finally {
 //				try {
 //					repo.close();
@@ -164,14 +159,11 @@ public class Main {
 			} catch (IOException ex) {
 				System.err.println("ERROR: I/O error");
 				exitcode = 255;
-			} catch (RepositoryException ex) {
-				System.err.println("ERROR: repository write failed: " + ex.getReason());
-				exitcode = 255;
 			} finally {
 				try {
 					repo.close();
-				} catch (RepositoryException ex) {
-					System.err.println("ERROR: repository failed to close: " + ex.getReason());
+				} catch (IOException ex) {
+					System.err.println("ERROR: repository failed to close");
 					exitcode = 255;
 				}
 			}
@@ -207,16 +199,8 @@ public class Main {
 					System.out.flush();
 					exitcode = 0;
 				}
-			} catch (RepositoryException ex) {
-				System.err.println("ERROR: repository read failed: " + ex.getReason());
-				exitcode = 255;
 			} finally {
-				try {
-					repo.close();
-				} catch (RepositoryException ex) {
-					System.err.println("ERROR: repository failed to close: " + ex.getReason());
-					exitcode = 255;
-				}
+				repo.close();
 			}
 			System.exit(exitcode);
 			return;
@@ -248,16 +232,8 @@ public class Main {
 				System.out.flush();
 				sis.close();
 				exitcode = 0;
-			} catch (RepositoryException ex) {
-				System.err.println("ERROR: repository read failed: " + ex.getReason());
-				exitcode = 255;
 			} finally {
-				try {
-					coll.close();
-				} catch (RepositoryException ex) {
-					System.err.println("ERROR: repository failed to close: " + ex.getReason());
-					exitcode = 255;
-				}
+				coll.close();
 			}
 			System.exit(exitcode);
 			return;

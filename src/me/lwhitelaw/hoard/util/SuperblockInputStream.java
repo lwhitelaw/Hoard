@@ -8,8 +8,6 @@ import java.util.ArrayDeque;
 
 import me.lwhitelaw.hoard.Hashes;
 import me.lwhitelaw.hoard.PackfileCollection;
-import me.lwhitelaw.hoard.RecoverableRepositoryException;
-import me.lwhitelaw.hoard.Repository;
 
 public class SuperblockInputStream extends InputStream {
 	private final PackfileCollection repo; // the repository from which blocks are read
@@ -49,18 +47,18 @@ public class SuperblockInputStream extends InputStream {
 		return currentBlock.get() & 0xFF;
 	}
 	
-	private ByteBuffer readBlockOrThrow(byte[] hash) {
+	private ByteBuffer readBlockOrThrow(byte[] hash) throws IOException {
 		ByteBuffer block = repo.readBlock(hash);
-		if (block == null) throw new RecoverableRepositoryException("Repo missing hash " + Hashes.hashToString(hash), null);
+		if (block == null) throw new IOException("Repo missing hash " + Hashes.hashToString(hash), null);
 		block.order(ByteOrder.BIG_ENDIAN);
 		return block;
 	}
 	
-	private ByteBuffer readSuperblockOrThrow(byte[] hash) {
+	private ByteBuffer readSuperblockOrThrow(byte[] hash) throws IOException {
 		ByteBuffer block = readBlockOrThrow(hash);
-		if (block.limit() < HEADER_SIZE) throw new RecoverableRepositoryException("Block " + Hashes.hashToString(hash) + " too short", null);
+		if (block.limit() < HEADER_SIZE) throw new IOException("Block " + Hashes.hashToString(hash) + " too short", null);
 		if (block.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) {
-			throw new RecoverableRepositoryException("Block " + Hashes.hashToString(hash) + " lacks magic value SUPERBLK", null);
+			throw new IOException("Block " + Hashes.hashToString(hash) + " lacks magic value SUPERBLK", null);
 		}
 		return block;
 	}
@@ -110,7 +108,7 @@ public class SuperblockInputStream extends InputStream {
 	
 	// Peek the top of stack and descend the tree from the current node
 	// stacking superblocks along the way to the leaf.
-	private void descendTreeFromTopOfStack() {
+	private void descendTreeFromTopOfStack() throws IOException {
 		boolean seenLevelZero = false;
 		while (!seenLevelZero) {
 			// peek top of stack

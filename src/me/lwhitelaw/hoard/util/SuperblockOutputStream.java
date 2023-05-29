@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import me.lwhitelaw.hoard.PackfileWriter;
-import me.lwhitelaw.hoard.RecoverableRepositoryException;
 import me.lwhitelaw.hoard.Repository;
 
 /**
@@ -69,7 +68,7 @@ public class SuperblockOutputStream extends OutputStream {
 	@Override
 	public void write(int b) throws IOException {
 		if (finalHash != null) throw new IllegalStateException("Stream closed");
-		if (treeFull) throw new RecoverableRepositoryException("No more data can be written to this stream without truncation", null);
+		if (treeFull) throw new IOException("No more data can be written to this stream without truncation", null);
 		currentBlock.put((byte) b);
 		// update moving sum
 		chunker.update(b);
@@ -189,10 +188,10 @@ public class SuperblockOutputStream extends OutputStream {
 		}
 	}
 	
-	private ByteBuffer getBlockListForLevel(int level) {
+	private ByteBuffer getBlockListForLevel(int level) throws IOException {
 		if (level >= currentSuperblocks.length) {
 			// Somehow accessed level 24... user would have written 2^252 bytes to see this!
-			throw new RecoverableRepositoryException("too many blocks", null);
+			throw new IOException("too many blocks", null);
 		}
 		if (currentSuperblocks[level] == null) {
 			currentSuperblocks[level] = ByteBuffer.allocate(65535).order(ByteOrder.BIG_ENDIAN);
