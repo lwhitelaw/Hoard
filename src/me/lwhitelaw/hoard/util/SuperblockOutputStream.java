@@ -4,12 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
-
 import me.lwhitelaw.hoard.PackfileWriter;
-import me.lwhitelaw.hoard.Repository;
 
 /**
  * An OutputStream that writes a series of variable-size blocks to a repository, with the hashes of these blocks coalesced into a
