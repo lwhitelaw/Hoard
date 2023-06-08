@@ -1,5 +1,6 @@
 package me.lwhitelaw.hoard;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryIteratorException;
@@ -9,15 +10,22 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PackfileCollection {
+/**
+ * A collection of packfiles that may be used as if they were one. Block reading operations will search all registered packfiles and
+ * return the block in the first packfile that has it. An error reading any packfile will pre-empt an operation early.
+ */
+public class PackfileCollection implements Closeable {
 	private final List<PackfileReader> openPackfiles;
 	
+	/**
+	 * Create an empty collection.
+	 */
 	public PackfileCollection() {
 		openPackfiles = new ArrayList<>();
 	}
 	
 	/**
-	 * Add the provided packfile reader.
+	 * Add the provided packfile reader. The packfile reader is assumed to be open.
 	 * @param reader Opened packfile to add
 	 */
 	public void addPackfile(PackfileReader reader) {

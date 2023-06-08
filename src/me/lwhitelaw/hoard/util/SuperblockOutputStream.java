@@ -17,6 +17,8 @@ import me.lwhitelaw.hoard.PackfileWriter;
  * Upon closure of the stream, the hash to the superblock tree can be obtained.
  */
 public class SuperblockOutputStream extends OutputStream {
+	// TODO: replace PackfileWriter with PackfileCollection
+	
 	// leaf blocks go to level 0
 	// once level 0 has 1024 blocks, all block hashes are compiled into a pointer block and put in level 1
 	// level 0 is then cleared; same process repeats for level 1, 2, etc...

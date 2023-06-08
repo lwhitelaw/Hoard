@@ -10,6 +10,9 @@ import java.util.Arrays;
  *
  */
 public class PackfileEntry {
+	/**
+	 * The size of an entry in bytes.
+	 */
 	public static final int BYTES = Format.ENTRY_SIZE;
 	
 	private final byte[] hash;
@@ -18,6 +21,14 @@ public class PackfileEntry {
 	private final int encodedLength;
 	private final long payloadIndex;
 	
+	/**
+	 * Construct a packfile entry from the provided data.
+	 * @param hash The hash array.
+	 * @param encoding The encoding magic value.
+	 * @param length The length of the payload.
+	 * @param encodedLength The length of the encoded data of the payload.
+	 * @param payloadIndex The index into the data area where the encoded payload is found.
+	 */
 	public PackfileEntry(byte[] hash, long encoding, int length, int encodedLength, long payloadIndex) {
 		this.hash = hash;
 		this.encoding = encoding;
@@ -30,26 +41,50 @@ public class PackfileEntry {
 		if (payloadIndex < 0) throw new IllegalArgumentException("Payload index is negative");
 	}
 	
+	/**
+	 * Get the hash array.
+	 * @return the hash array
+	 */
 	public byte[] getHash() {
 		return hash;
 	}
 	
+	/**
+	 * Get the encoding magic value.
+	 * @return the encoding magic value
+	 */
 	public long getEncoding() {
 		return encoding;
 	}
 	
+	/**
+	 * Get the length of the payload.
+	 * @return the length of the payload
+	 */
 	public int getLength() {
 		return length;
 	}
 	
+	/**
+	 * Get the length of the payload when encoded.
+	 * @return the encoded payload length
+	 */
 	public int getEncodedLength() {
 		return encodedLength;
 	}
-	
+	/**
+	 * Get the index of the encoded payload in the data area of the packfile.
+	 * @return the payload index
+	 */
 	public long getPayloadIndex() {
 		return payloadIndex;
 	}
 	
+	/**
+	 * Create a packfile entry from a buffer.
+	 * @param buf the buffer to decode from
+	 * @return a decoded packfile entry
+	 */
 	public static PackfileEntry fromBuffer(ByteBuffer buf) {
 		buf.order(ByteOrder.BIG_ENDIAN);
 		byte[] hash = new byte[32];
@@ -63,6 +98,10 @@ public class PackfileEntry {
 		return new PackfileEntry(hash, encoding, length, encodedLength, payloadIndex);
 	}
 	
+	/**
+	 * Serialise this packfile entry to the provided buffer.
+	 * @param buf the buffer to write into
+	 */
 	public void toBuffer(ByteBuffer buf) {
 		buf.order(ByteOrder.BIG_ENDIAN);
 		buf.put(hash);
@@ -73,6 +112,9 @@ public class PackfileEntry {
 		buf.putLong(0x00000000_00000000L); // reserved
 	}
 	
+	/**
+	 * Test if two packfile entries are identical.
+	 */
 	@Override
 	public boolean equals(Object obj) {
 		if (!(obj instanceof PackfileEntry)) return false;
@@ -84,6 +126,9 @@ public class PackfileEntry {
 				&& payloadIndex == other.payloadIndex;
 	}
 	
+	/**
+	 * Compute a hash code for this packfile entry.
+	 */
 	@Override
 	public int hashCode() {
 		int h = Arrays.hashCode(hash);
@@ -99,6 +144,11 @@ public class PackfileEntry {
 		return String.format("{%s,'%s',%d (encoded: %d), index: %016X}", Hashes.hashToString(hash),encodingToString(encoding),length,encodedLength,payloadIndex);
 	}
 	
+	/**
+	 * Convert the provided encoding magic value to a string.
+	 * @param encoding the encoding magic value
+	 * @return a human-readable string for the magic value
+	 */
 	public static String encodingToString(long encoding) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 7; i >= 0; i--) {

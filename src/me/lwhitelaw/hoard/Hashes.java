@@ -101,6 +101,11 @@ public final class Hashes {
 		}
 	});
 	
+	/**
+	 * Hash the input with SHA3-256, consuming the remaining data.
+	 * @param input The input to hash
+	 * @return The SHA3-256 of the data
+	 */
 	public static byte[] doHash(ByteBuffer input) {
 		MessageDigest sha3 = SHA3_256.get();
 		sha3.reset();

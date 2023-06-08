@@ -1,6 +1,7 @@
 package me.lwhitelaw.hoard;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
@@ -11,11 +12,21 @@ import java.util.zip.DataFormatException;
 import me.lwhitelaw.hoard.util.Buffers;
 import static me.lwhitelaw.hoard.Format.*;
 
+/**
+ * A reader for a Hoard packfile. Blocks may be requested by their hash, or enumerated. Other properties of the Hoard packfile
+ * may also be requested. Instances are safe for concurrent use.
+ *
+ */
 public class PackfileReader {
 	private final FileChannel file;
 	private final long blocktableStart;
 	private final int blocktableLength;
 	
+	/**
+	 * Open a Hoard packfile at the provided path.
+	 * @param filePath The path to the packfile to open
+	 * @throws IOException if the file could not be opened or is invalid.
+	 */
 	public PackfileReader(Path filePath) throws IOException {
 		file = FileChannel.open(filePath, StandardOpenOption.READ);
 		// Check header and initialise locations
@@ -39,28 +50,39 @@ public class PackfileReader {
 		}
 	}
 	
+	/**
+	 * Read a block with the specified hash, returning a buffer holding the data. Null is returned if the block is not present.
+	 * The data returned is assumed to be trusted; there is no check that the data returned hashes to the value provided. Clients using
+	 * untrusted packfiles should verify the returned data to ensure that this is the case.
+	 * @param hash the hash to request
+	 * @return the data in a new buffer, or null if not found
+	 * @throws IOException if the data could not be read due to an error in reading or decoding
+	 */
 	public ByteBuffer readBlock(byte[] hash) throws IOException {
 		PackfileEntry entry = locateEntryForHash(hash);
 		if (entry == null) return null;
 		return readPackfileEntryPayload(entry,false);
 	}
 	
+	/**
+	 * Close this packfile. In case of an error, UncheckedIOException is thrown, wrapping the exception that caused it.
+	 */
 	public void close() {
 		try {
 			file.close();
 		} catch (IOException ex) {
-			throw new RuntimeException("I/O error on close; this seems rather unlikely", ex);
+			throw new UncheckedIOException("I/O error on close; this seems rather unlikely", ex);
 		}
 	}
 	
 	// Utilities
 	
+	/**
+	 * Get the number of entries in the blocktable.
+	 * @return the number of entries
+	 */
 	public int getBlocktableLength() {
 		return blocktableLength;
-	}
-	
-	public long getBlocktableStart() {
-		return blocktableStart;
 	}
 	
 	/**
