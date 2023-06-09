@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+
+import me.lwhitelaw.hoard.PackfileCollection;
 import me.lwhitelaw.hoard.PackfileWriter;
 
 /**
@@ -17,15 +19,14 @@ import me.lwhitelaw.hoard.PackfileWriter;
  * Upon closure of the stream, the hash to the superblock tree can be obtained.
  */
 public class SuperblockOutputStream extends OutputStream {
-	// TODO: replace PackfileWriter with PackfileCollection
-	
 	// leaf blocks go to level 0
 	// once level 0 has 1024 blocks, all block hashes are compiled into a pointer block and put in level 1
 	// level 0 is then cleared; same process repeats for level 1, 2, etc...
 	// once stream is finished, lower levels have their blocks combined into upper levels
 	// until reaching the top
 	
-	private final PackfileWriter repo; // the repository to which all blocks are written
+	private PackfileWriter repo; // the packfile to which all blocks are written; may be changed mid-stream
+	private PackfileCollection collection; // if present, collection of packfiles used to deduplicate blocks
 	private final ByteBuffer[] currentSuperblocks; // buffers for up to 24 levels of superblocks yet to be written
 	private final ByteBuffer currentBlock; // buffer for the current leaf block yet to be written
 	private byte[] finalHash; // hash root of the superblock tree; null while the stream isn't closed
@@ -55,11 +56,26 @@ public class SuperblockOutputStream extends OutputStream {
 	
 	public SuperblockOutputStream(PackfileWriter repo) {
 		this.repo = repo;
+		collection = null;
 		currentBlock = ByteBuffer.allocate(65535).order(ByteOrder.BIG_ENDIAN);
 		currentSuperblocks = new ByteBuffer[MAX_LEVELS];
 		nonempty = false;
 		treeFull = false;
 		chunker = new Chunker(10,12); // sum of last 1024 bytes, try to cut at 4K bytes
+	}
+	
+	public void setDeduplicationCollection(PackfileCollection collection) {
+		this.collection = collection;
+	}
+	
+	public boolean isStreamAtSafepoint() {
+		return currentBlock.position() == 0;
+	}
+	
+	public void setPackfileWriter(PackfileWriter writer) {
+		if (writer == null) throw new NullPointerException("null writer");
+		if (!isStreamAtSafepoint()) throw new IllegalStateException("Cannot change packfiles at this time");
+		this.repo = writer;
 	}
 
 	@Override
