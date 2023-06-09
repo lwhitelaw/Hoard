@@ -7,6 +7,8 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.DataFormatException;
 
 import me.lwhitelaw.hoard.util.Buffers;
@@ -62,6 +64,20 @@ public class PackfileReader {
 		PackfileEntry entry = locateEntryForHash(hash);
 		if (entry == null) return null;
 		return readPackfileEntryPayload(entry,false);
+	}
+	
+	/**
+	 * Enumerate all blocks in this packfile and return their entries.
+	 * @return a list of all entries in this packfile
+	 * @throws IOException if there is an error while reading the blocktable
+	 */
+	public List<PackfileEntry> enumerateBlocks() throws IOException {
+		ArrayList<PackfileEntry> blockList = new ArrayList<>();
+		for (int i = 0; i < blocktableLength; i++) {
+			PackfileEntry entry = getBlocktableEntry(i);
+			blockList.add(entry);
+		}
+		return blockList;
 	}
 	
 	/**
