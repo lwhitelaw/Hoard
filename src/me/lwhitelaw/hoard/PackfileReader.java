@@ -67,7 +67,7 @@ public class PackfileReader {
 	}
 	
 	/**
-	 * Enumerate all blocks in this packfile and return their entries.
+	 * Enumerate all blocks in this packfile and return their entries. This is a potentially expensive operation.
 	 * @return a list of all entries in this packfile
 	 * @throws IOException if there is an error while reading the blocktable
 	 */
@@ -102,7 +102,7 @@ public class PackfileReader {
 	}
 	
 	/**
-	 * Get the entry in the block table at the specified index.
+	 * Get the entry in the block table at the specified index. The index is not checked.
 	 * @param index the index into the block table to read
 	 * @return the block table entry
 	 * @throws IOException if there are problems reading the file or if the entry is malformed

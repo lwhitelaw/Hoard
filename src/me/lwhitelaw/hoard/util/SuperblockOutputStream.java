@@ -13,8 +13,9 @@ import me.lwhitelaw.hoard.PackfileWriter;
  * B-tree of pointer superblocks. Each data block is formed from chunking the stream using a moving sum creating variable-sized
  * blocks ranging from 4096 to 65535 bytes. Superblocks contain at most 1024 pointers to subblocks.
  * 
- * A superblock tree emitted by this class can store any amount of data up to the tree depth limit of 24, provided the underlying repository
- * is capable of storing all of the blocks required to represent it.
+ * A superblock tree emitted by this class can store any amount of data up to the tree depth limit of 24, provided the underlying packfile writers
+ * are capable of storing all of the blocks required to represent it. Packfile writers may be changed at certain safepoints if very large
+ * amounts of data must be written at once.
  * 
  * Upon closure of the stream, the hash to the superblock tree can be obtained.
  */
