@@ -9,6 +9,10 @@ import java.util.ArrayDeque;
 import me.lwhitelaw.hoard.Hashes;
 import me.lwhitelaw.hoard.PackfileCollection;
 
+/**
+ * An InputStream that reads a series of variable-size blocks from a collection of packfiles as produced by {@linkplain SuperblockOutputStream},
+ * starting from a root hash.
+ */
 public class SuperblockInputStream extends InputStream {
 	private final PackfileCollection repo; // the repository from which blocks are read
 	private final byte[] startingHash; // the original hash from which data is read
@@ -26,6 +30,12 @@ public class SuperblockInputStream extends InputStream {
 	// Magic values
 	private static final long HEADER_MAGIC = 0x5355504552424C4BL; // "SUPERBLK", magic for all superblocks
 
+	/**
+	 * Construct a SuperblockInputStream that will reference the provided packfile collection, starting the stream with the given
+	 * root tree hash.
+	 * @param repo The packfile collection to read from
+	 * @param hash the root tree hash to read
+	 */
 	public SuperblockInputStream(PackfileCollection repo, byte[] hash) {
 		this.repo = repo;
 		startingHash = new byte[hash.length];
@@ -34,6 +44,11 @@ public class SuperblockInputStream extends InputStream {
 		currentBlock = null;
 	}
 
+	/**
+	 * Read a byte value from 0 to 255, or return -1 if the end of stream is reached. This method blocks until input is available.
+	 * An IOException will be thrown if a block required by the tree is missing or malformed at the moment that block is attempted to be read
+	 * by this class' internals.
+	 */
 	@Override
 	public int read() throws IOException {
 		while (currentBlock == null || !currentBlock.hasRemaining()) {
@@ -47,6 +62,7 @@ public class SuperblockInputStream extends InputStream {
 		return currentBlock.get() & 0xFF;
 	}
 	
+	// Read a block or throw an IOException if it is missing.
 	private ByteBuffer readBlockOrThrow(byte[] hash) throws IOException {
 		ByteBuffer block = repo.readBlock(hash);
 		if (block == null) throw new IOException("Repo missing hash " + Hashes.hashToString(hash), null);
@@ -54,6 +70,7 @@ public class SuperblockInputStream extends InputStream {
 		return block;
 	}
 	
+	// Read a superblock or throw an IOException if it is missing or malformed.
 	private ByteBuffer readSuperblockOrThrow(byte[] hash) throws IOException {
 		ByteBuffer block = readBlockOrThrow(hash);
 		if (block.limit() < HEADER_SIZE) throw new IOException("Block " + Hashes.hashToString(hash) + " too short", null);
@@ -63,6 +80,8 @@ public class SuperblockInputStream extends InputStream {
 		return block;
 	}
 	
+	// Move on to the next data block, popping empty superblocks and stacking new superblocks as needed for in-order tree traversal
+	// Return true on success, false if no blocks remain, or throw an exception on read error.
 	private boolean nextBlock() throws IOException {
 		// is stack empty? read first root superblock
 		if (currentSuperblocks.isEmpty()) {
@@ -142,10 +161,13 @@ public class SuperblockInputStream extends InputStream {
 		}
 	}
 	
+	// Get the "number of blocks" field in the given superblock buffer
 	private static int getSuperblockNumBlocks(ByteBuffer superblock) {
 		return superblock.getShort(HEADER_OFFS_NUM_BLOCKS) & 0xFFFF;
 	}
 	
+	// Get the "level" field in the given superblock buffer
+	// Level 0 means subblocks are data, else subblocks are superblocks of level n-1
 	private static int getSuperblockLevel(ByteBuffer superblock) {
 		return superblock.get(HEADER_OFFS_LEVEL) & 0xFF;
 	}

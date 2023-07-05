@@ -15,7 +15,7 @@ import me.lwhitelaw.hoard.PackfileWriter;
  * 
  * A superblock tree emitted by this class can store any amount of data up to the tree depth limit of 24, provided the underlying packfile writers
  * are capable of storing all of the blocks required to represent it. Packfile writers may be changed at certain safepoints if very large
- * amounts of data must be written at once.
+ * amounts of data must be written at once. This may be required if a stream is 4 TB or larger, given a packfile can only hold 2^31-1 unique blocks.
  * 
  * Upon closure of the stream, the hash to the superblock tree can be obtained.
  */
@@ -55,6 +55,10 @@ public class SuperblockOutputStream extends OutputStream {
 	 * That ought to be practically infinite for all intents and purposes.
 	 */
 	
+	/**
+	 * Construct an output stream destined to the provided packfile writer.
+	 * @param repo The packfile writer to write to
+	 */
 	public SuperblockOutputStream(PackfileWriter repo) {
 		this.repo = repo;
 		collection = null;
@@ -63,22 +67,45 @@ public class SuperblockOutputStream extends OutputStream {
 		nonempty = false;
 		treeFull = false;
 		chunker = new Chunker(10,12); // sum of last 1024 bytes, try to cut at 4K bytes
+		finalHash = null;
 	}
 	
+	/**
+	 * Set the packfile collection that will be used for extra deduplication. If the output stream writes out a block,
+	 * the provided collection will be queried to see if the block already exists. If so, it will not be written out.
+	 * Null may be provided if there is no collection to deduplicate against.
+	 * @param collection the packfile collection to query for duplicated blocks
+	 */
 	public void setDeduplicationCollection(PackfileCollection collection) {
 		this.collection = collection;
 	}
 	
+	/**
+	 * Check if it is safe to switch packfile writers.
+	 * @return true if it is possible to change packfile writers
+	 */
 	public boolean isStreamAtSafepoint() {
 		return currentBlock.position() == 0;
 	}
 	
+	/**
+	 * Change the internal packfile writer to the specified writer
+	 * @param writer the new writer to use
+	 */
 	public void setPackfileWriter(PackfileWriter writer) {
 		if (writer == null) throw new NullPointerException("null writer");
 		if (!isStreamAtSafepoint()) throw new IllegalStateException("Cannot change packfiles at this time");
 		this.repo = writer;
 	}
 
+	/**
+	 * Write a byte to the output stream. Bytes will be buffered until a chunk boundary is found, forcing a write to the underlying
+	 * packfile writer. Superblocks will also be written as necessary. Therefore, a call to this method might not immediately write
+	 * to the underlying packfile, and if it does, it may result in multiple blocks being written. Users writing very large
+	 * data streams that might reach the packfile block limit should consider changing writers regularly.
+	 * @throws IOException if the stream is closed, if the internal limit on data size is hit, or if there is an error in the
+	 * underlying packfile writer
+	 */
 	@Override
 	public void write(int b) throws IOException {
 		if (finalHash != null) throw new IllegalStateException("Stream closed");
@@ -202,6 +229,8 @@ public class SuperblockOutputStream extends OutputStream {
 		}
 	}
 	
+	// Get buffer for a given level in the superblock tree yet to be written.
+	// Create if it does not exist.
 	private ByteBuffer getBlockListForLevel(int level) throws IOException {
 		if (level >= currentSuperblocks.length) {
 			// Somehow accessed level 24... user would have written 2^252 bytes to see this!
@@ -214,6 +243,7 @@ public class SuperblockOutputStream extends OutputStream {
 		return currentSuperblocks[level];
 	}
 	
+	// Given a superblock buffer, reset it with a header appropriate to its level in the tree
 	private static void resetSuperblock(ByteBuffer superblock, int level) {
 		// Make sure it is cleared
 		superblock.clear();
@@ -225,6 +255,7 @@ public class SuperblockOutputStream extends OutputStream {
 		// position now where hashes will be written
 	}
 	
+	// Given a block hash, place it in a superblock buffer and update its header data
 	private static void putHashInSuperblock(ByteBuffer superblock, byte[] hash) {
 		int position = superblock.position();
 		// Increment hash count (these are absolute so position shouldn't move, save it just in case)
@@ -238,14 +269,20 @@ public class SuperblockOutputStream extends OutputStream {
 		superblock.put(hash);
 	}
 	
+	// Get the "number of blocks" field in the given superblock buffer
 	private static int getSuperblockNumBlocks(ByteBuffer superblock) {
 		return superblock.getShort(HEADER_OFFS_NUM_BLOCKS) & 0xFFFF;
 	}
 	
+	// Set the "number of blocks" field in the given superblock buffer
 	private static void setSuperblockNumBlocks(ByteBuffer superblock, int value) {
 		superblock.putShort(HEADER_OFFS_NUM_BLOCKS, (short) value);
 	}
 	
+	/**
+	 * Close the output stream and write out any pending blocks and tree superblocks to the underlying packfile writer.
+	 * The computed hash for the stream will be made available through {@link #getHash()}.
+	 */
 	@Override
 	public void close() throws IOException {
 		// if the final hash has been assigned there is nothing to do
@@ -256,6 +293,10 @@ public class SuperblockOutputStream extends OutputStream {
 		consolidateBlocks();
 	}
 	
+	/**
+	 * Get the computed hash for this output stream. If the stream is not closed, this will return null.
+	 * @return the computed hash for the output stream
+	 */
 	public byte[] getHash() {
 		return finalHash;
 	}
