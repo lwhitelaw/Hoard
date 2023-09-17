@@ -14,11 +14,14 @@ import me.lwhitelaw.hoard.Hashes;
 import me.lwhitelaw.hoard.PackfileCollection;
 import me.lwhitelaw.hoard.PackfileReader;
 import me.lwhitelaw.hoard.PackfileWriter;
+import me.lwhitelaw.hoard.util.OptionParser;
 import me.lwhitelaw.hoard.util.SuperblockInputStream;
 import me.lwhitelaw.hoard.util.SuperblockOutputStream;
 
 public class Main {
 	public static void main(String[] args) throws IOException {
+		// call into test
+		testArgParser();
 		// check arguments to switch on command
 		if (args.length < 1) {
 			help();
@@ -69,6 +72,26 @@ public class Main {
 		}
 	}
 	
+	private static void testArgParser() {
+		String[] argv = {"hello","-abci","world","-absworld","-s","seperate","-s","-i","--","-a"};
+		OptionParser parser = new OptionParser(argv, "ios:e:abc");
+		int opt;
+		while ((opt = parser.getopt()) != -1) {
+			if (opt == '?') {
+				System.out.println("Bad arg " + (char) parser.optopt());
+			}
+			if (opt == ':') {
+				System.out.println("option missing arg " + (char) parser.optopt());
+			}
+			System.out.println("Arg matched: " + (char) opt + " arg: " + parser.optarg());
+		}
+		System.out.println("Remaining argv: ");
+		for (String s : parser.getArgv()) {
+			System.out.println(s);
+		}
+		System.exit(0);
+	}
+
 	private static void help() {
 		System.out.println("Hoard CAS file repository manager");
 		System.out.println("Usage: <command> <repofile> [args]");
