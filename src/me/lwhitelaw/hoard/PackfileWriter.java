@@ -117,6 +117,8 @@ public final class PackfileWriter {
 		long dataAreaStart = Format.OFFS_BLOCKTABLE_START + Format.ENTRY_SIZE * numBlocks;
 		// Write out the header with the blocktable meta
 		writeHeader(numBlocks, dataAreaStart, file);
+		// set file position after header
+		file.position(Format.OFFS_BLOCKTABLE_START);
 		// Write out the block table entries by traversing tree values in ascending order
 		ByteBuffer ebuf = ByteBuffer.allocateDirect(Format.ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
 		for (PackfileEntry entry : entries.values()) {

@@ -1,8 +1,10 @@
 package me.lwhitelaw.hoard.ui;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -23,7 +25,7 @@ import me.lwhitelaw.hoard.util.SuperblockOutputStream;
 public class Main {
 	public static void main(String[] args) throws IOException {
 		// call into test
-		testArgParser();
+//		testArgParser();
 		// check arguments to switch on command
 		if (args.length < 1) {
 			help();
@@ -62,8 +64,8 @@ public class Main {
 			case "readlong":
 				// block read
 				// check enough args to call
-				if (args.length == 3) {
-					readlong(args[1], args[2]);
+				if (args.length == 4) {
+					readlong(args[1], args[2], args[3]);
 				} else {
 					help();
 				}
@@ -229,22 +231,37 @@ public class Main {
 		}
 	}
 	
-	private static void readlong(String repofile, String hash) {
+	private static void readlong(String repofile, String hash, String out) {
 		try {
 			Path repopath = validatePath(repofile); // where repo will be stored
+			Path outpath = validatePath(out); // where file is output
 			byte[] hasharray = validateHash(hash);
 			// Initialise repo
 			PackfileReader repo = getReader(repopath);
 			int exitcode = 0;
 			try {
-				// Read repo block and write to standard out
+				// Read repo block and write to outstream
 				BigBlockInputStream sis = new BigBlockInputStream(repo::readBlock,hasharray);
+				OutputStream stream = new BufferedOutputStream(Files.newOutputStream(outpath), 65536);
+				// Metrics
+				long startTime = System.currentTimeMillis();
+				long prevSample = startTime;
+				long transferred = 0;
+				long prevTransferred = 0;
+				
 				int c;
 				while ((c = sis.read()) != -1) {
-					System.out.write(c & 0xFF);
+					stream.write(c & 0xFF);
+					transferred++;
+					if ((System.currentTimeMillis()-prevSample) >= 2000) {
+						long now = System.currentTimeMillis();
+						System.out.println(StatusLine.formatTransferSpeed(now, prevSample, startTime, transferred, prevTransferred, out));
+						prevTransferred = transferred;
+						prevSample = now;
+					}
 				}
-				System.out.flush();
 				sis.close();
+				stream.close();
 				exitcode = 0;
 			} finally {
 				repo.close();

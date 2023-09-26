@@ -97,6 +97,13 @@ public class StatusLine {
 		return String.format("%.2f%% %s/s %s/%s %s %s", percentDone, formatBytes((long)(transferRateInstant * 1000)), formatBytes(nowTransferred), formatBytes(amountOfBytes), formatTime(timeRemaining), extraText);
 	}
 	
+	public static String formatTransferSpeed(long nowMillis, long prevMillis, long startMillis, long nowTransferred, long prevTransferred, String extraText) {
+		// Determine instantaneous rate of data transfer
+		float transferRateInstant = bytesPerMillisRate(nowTransferred-prevTransferred, nowMillis-prevMillis);
+		// Format string
+		return String.format("%s/s %s %s", formatBytes((long)(transferRateInstant * 1000)), formatBytes(nowTransferred), extraText);
+	}
+	
 	public static float percentDone(long nowTransferred, long totalBytes) {
 		return ((float) nowTransferred / (float) totalBytes) * 100.0f;
 	}
