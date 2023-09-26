@@ -14,6 +14,8 @@ import me.lwhitelaw.hoard.Hashes;
 import me.lwhitelaw.hoard.PackfileCollection;
 import me.lwhitelaw.hoard.PackfileReader;
 import me.lwhitelaw.hoard.PackfileWriter;
+import me.lwhitelaw.hoard.util.BigBlockInputStream;
+import me.lwhitelaw.hoard.util.BigBlockOutputStream;
 import me.lwhitelaw.hoard.util.OptionParser;
 import me.lwhitelaw.hoard.util.SuperblockInputStream;
 import me.lwhitelaw.hoard.util.SuperblockOutputStream;
@@ -142,13 +144,13 @@ public class Main {
 			Path blockpath = validatePath(filename); // where to source the block data
 			validateFile(blockpath,false);
 			// Initialise repo
-			PackfileWriter repo = getWriter(repopath);
+			PackfileWriter repo = new PackfileWriter();
 			
 			int exitcode = 0;
 			try {
 				// Open file input stream
 				InputStream stream = new BufferedInputStream(Files.newInputStream(blockpath), 65536);
-				SuperblockOutputStream sos = new SuperblockOutputStream(repo);
+				BigBlockOutputStream sos = new BigBlockOutputStream(repo::writeBlock);
 				// Metrics
 				long startTime = System.currentTimeMillis();
 				long prevSample = startTime;
@@ -165,7 +167,6 @@ public class Main {
 						System.out.println(StatusLine.formatTransferProgress(now, prevSample, startTime, transferred, prevTransferred, total, filename));
 						prevTransferred = transferred;
 						prevSample = now;
-//						repo.sync();
 					}
 				}
 				stream.close();
@@ -177,9 +178,9 @@ public class Main {
 				exitcode = 255;
 			} finally {
 				try {
-					repo.close();
+					repo.dump(repopath);
 				} catch (IOException ex) {
-					System.err.println("ERROR: repository failed to close");
+					System.err.println("ERROR: repository failed to dump");
 					exitcode = 255;
 				}
 			}
@@ -234,13 +235,10 @@ public class Main {
 			byte[] hasharray = validateHash(hash);
 			// Initialise repo
 			PackfileReader repo = getReader(repopath);
-			PackfileCollection coll = new PackfileCollection();
-			coll.addPackfile(repo);
-			
 			int exitcode = 0;
 			try {
 				// Read repo block and write to standard out
-				SuperblockInputStream sis = new SuperblockInputStream(coll, hasharray);
+				BigBlockInputStream sis = new BigBlockInputStream(repo::readBlock,hasharray);
 				int c;
 				while ((c = sis.read()) != -1) {
 					System.out.write(c & 0xFF);
@@ -249,7 +247,7 @@ public class Main {
 				sis.close();
 				exitcode = 0;
 			} finally {
-				coll.close();
+				repo.close();
 			}
 			System.exit(exitcode);
 			return;
