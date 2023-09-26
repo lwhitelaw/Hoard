@@ -12,16 +12,16 @@ public class Format {
 	 * {
 	 * 		// Header
 	 * 		byte[8] magic = "Hoard v1";
-	 * 		int64 blocktableStart;
-	 * 		int32 blocktableLength;
-	 * 		byte[44] reserved = { 0x00, 0x00 ... 0x00 } // Pads header to 64 bytes
-	 * 		// Data in this area has no defined format, but *is* pointed into by the block table
-	 * 		// The only requirement is that a blocktable entry alone provides enough information to extract
-	 * 		// and decode block payload data from this area. The data area is padded to 64 byte multiples
-	 * 		// so the blocktable starts on such a multiple.
-	 * 		byte[] dataArea
-	 *		// Block table; blocktableStart points to first entry
+	 * 		int64 blocktableLength;
+	 *		int64 dataAreaStart;
+	 * 		byte[52] reserved = { 0x00, 0x00 ... 0x00 } // Pads header to 64 bytes
+	 *		// Block table
 	 * 		Entry[blocktableLength] blocktable;
+	 * 	 	// Data in this area has no defined format, but *is* pointed into by the block table
+	 * 		// The only requirement is that a blocktable entry alone provides enough information to extract
+	 * 		// and decode block payload data from this area.
+	 *		// dataAreaStart points here
+	 * 		byte[] dataArea
 	 * 		<eof>
 	 * }
 	 * 
@@ -37,11 +37,10 @@ public class Format {
 	 */
 	// Offsets into the packfile header
 	public static final int HEADER_OFFS_MAGIC = 0; // Magic value (should be HEADER_MAGIC)
-	public static final int HEADER_OFFS_BLOCKTABLE_START = 8; // Signed 64-bit absolute position of the block table start within the file
-	public static final int HEADER_OFFS_BLOCKTABLE_LENGTH = 16; // Signed 32-bit number of entries in the block table
-	public static final int HEADER_OFFS_RESERVED = 20; // Reserved for future use. 44 zero bytes.
-	public static final int HEADER_SIZE = 64; // size of the header in bytes
-	public static final int DATA_AREA_OFFS_START = HEADER_SIZE; // Start of the data area
+	public static final int HEADER_OFFS_BLOCKTABLE_LENGTH = 8; // Signed 64-bit number of entries in the block table
+	public static final int HEADER_OFFS_DATA_AREA_START = 16; // Signed 64-bit absolute position where block data starts
+	public static final int HEADER_OFFS_RESERVED = 24; // Reserved for future use. 40 zero bytes.
+	public static final int HEADER_SIZE = 64; // size of the header in bytes; where blocktable starts
 	// Offsets into a blocktable entry
 	public static final int ENTRY_OFFS_HASH = 0; // 32-byte hash. (256-bit SHA3)
 	public static final int ENTRY_OFFS_ENCODING = 32; // Compression encoding format, 8 bytes
@@ -50,6 +49,9 @@ public class Format {
 	public static final int ENTRY_OFFS_PAYLOAD = 48; // Pointer to payload from the start of the data area, signed 64-bit
 	public static final int ENTRY_OFFS_RESERVED = 56; // 8 bytes of reserved data
 	public static final int ENTRY_SIZE = 64;
+	// Offsets into the file
+	public static final long OFFS_HEADER_START = 0;
+	public static final long OFFS_BLOCKTABLE_START = HEADER_SIZE;
 	// Magic values
 	public static final long HEADER_MAGIC = 0x486F6172_64207631L; // "Hoard v1", start of a file
 	public static final long RAW_ENCODING = 0x00000000_00000000L; // raw encoded payload

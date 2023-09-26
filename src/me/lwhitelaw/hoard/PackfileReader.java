@@ -21,8 +21,8 @@ import static me.lwhitelaw.hoard.Format.*;
  */
 public class PackfileReader {
 	private final FileChannel file;
-	private final long blocktableStart;
-	private final int blocktableLength;
+	private final long blocktableLength;
+	private final long dataAreaStart;
 	
 	/**
 	 * Open a Hoard packfile at the provided path.
@@ -32,23 +32,20 @@ public class PackfileReader {
 	public PackfileReader(Path filePath) throws IOException {
 		file = FileChannel.open(filePath, StandardOpenOption.READ);
 		// Check header and initialise locations
+		// Checks are only basic for speed
 		{
 			ByteBuffer hbuf = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
-			Buffers.readFileFully(file, hbuf, HEADER_OFFS_MAGIC);
+			Buffers.readFileFully(file, hbuf, OFFS_HEADER_START);
 			// check EOF
 			if (hbuf.hasRemaining()) throw new IOException("Unexpected end of file");
 			// check magic is valid
 			if (hbuf.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) throw new IOException("Incorrect magic value");
 			// extract and check blocktable length
-			blocktableLength = hbuf.getInt(HEADER_OFFS_BLOCKTABLE_LENGTH);
+			blocktableLength = hbuf.getLong(HEADER_OFFS_BLOCKTABLE_LENGTH);
 			if (blocktableLength < 0) throw new IOException("Blocktable length is invalid: " + blocktableLength);
-			// extract and check blocktable start
-			blocktableStart = hbuf.getLong(HEADER_OFFS_BLOCKTABLE_START);
-			if (blocktableStart < 0) throw new IOException("Blocktable start is invalid: " + blocktableStart);
-			// check that start + length * 64 equals the end of file
-			if ((blocktableStart + (blocktableLength * ENTRY_SIZE)) != file.size()) {
-				throw new IOException("The end of the blocktable does not end the file");
-			}
+			// extract and check the data area start that it isn't negative
+			dataAreaStart = hbuf.getLong(HEADER_OFFS_DATA_AREA_START);
+			if (dataAreaStart < 0) throw new IOException("Data area start is invalid: " + dataAreaStart);
 		}
 	}
 	
@@ -97,7 +94,7 @@ public class PackfileReader {
 	 * Get the number of entries in the blocktable.
 	 * @return the number of entries
 	 */
-	public int getBlocktableLength() {
+	public long getBlocktableLength() {
 		return blocktableLength;
 	}
 	
@@ -107,10 +104,9 @@ public class PackfileReader {
 	 * @return the block table entry
 	 * @throws IOException if there are problems reading the file or if the entry is malformed
 	 */
-	public PackfileEntry getBlocktableEntry(int index) throws IOException {
+	public PackfileEntry getBlocktableEntry(long index) throws IOException {
 		ByteBuffer ebuf = ByteBuffer.allocate(ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
-		long filePosition = (long)ENTRY_SIZE * (long)index + (long)blocktableStart;
-//		file.position(filePosition);
+		long filePosition = (long)ENTRY_SIZE * (long)index + Format.OFFS_BLOCKTABLE_START;
 		Buffers.readFileFully(file, ebuf, filePosition);
 		// check EOF
 		if (ebuf.hasRemaining()) throw new IOException("Unexpected end of file");
@@ -133,18 +129,17 @@ public class PackfileReader {
 	 */
 	public ByteBuffer readPackfileEntryPayload(PackfileEntry entry, boolean doNotDecode) throws IOException {
 		// Calculate position into the file based on the packfile index
-		long startOfDataArea = DATA_AREA_OFFS_START;
+		long startOfDataArea = dataAreaStart;
 		// Calculate file position
 		long filePosition = startOfDataArea + entry.getPayloadIndex();
 		// Check if payload index makes sense
 		// This should not be a problem, but might as well check
-		if (filePosition + entry.getEncodedLength() > blocktableStart) {
+		if (filePosition + entry.getEncodedLength() > file.size()) {
 			// Overflow detected!
-			throw new IOException("Payload index would overflow data area");
+			throw new IOException("Payload index would exceed size of file");
 		}
 		// Allocate buffer and read encoded data
 		ByteBuffer encoded = ByteBuffer.allocate(entry.getEncodedLength());
-//		file.position(filePosition);
 		Buffers.readFileFully(file, encoded, filePosition);
 		if (encoded.hasRemaining()) throw new IOException("Unexpected end of file");
 		encoded.flip(); // filling -> draining
@@ -181,12 +176,12 @@ public class PackfileReader {
 		// Classical binary search, bounds are inclusive.
 		// Failure checks are placed in both comparisons to enforce that neither low nor
 		// high leave the bounds of the array over the algorithm's execution.
-		int low = 0;
-		int high = blocktableLength - 1;
+		long low = 0;
+		long high = blocktableLength - 1;
 		// loop until returned from
 		while (low <= high) {
 			// Find the midpoint. Calculation is written to avoid overflow.
-			int mid = low + (high - low) / 2;
+			long mid = low + (high - low) / 2;
 			// Grab this entry.
 			PackfileEntry midEntry = getBlocktableEntry(mid);
 			// Run comparison check against the target hash.
