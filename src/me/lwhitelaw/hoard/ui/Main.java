@@ -112,26 +112,19 @@ public class Main {
 			Path repopath = validatePath(repofile); // where repo will be stored
 			Path blockpath = validatePath(filename); // where to source the block data
 			validateFile(blockpath,true);
-			// Initialise repo
-			PackfileWriter repo = getWriter(repopath);
+			// Initialise a writer
+			PackfileWriter repo = new PackfileWriter();
 			
 			int exitcode = 0;
 			try {
 				// Read file and write to repo
 				ByteBuffer buffer = ByteBuffer.wrap(Files.readAllBytes(blockpath));
 				byte[] hash = repo.writeBlock(buffer);
-				repo.close();
+				repo.dump(repopath);
 				System.out.println(Hashes.hashToString(hash));
 			} catch (IOException ex) {
 				System.err.println("ERROR: I/O error");
 				exitcode = 255;
-			} finally {
-//				try {
-//					repo.close();
-//				} catch (RepositoryException ex) {
-//					System.err.println("ERROR: repository failed to close: " + ex.getReason());
-//					exitcode = 255;
-//				}
 			}
 			System.exit(exitcode);
 			return;
@@ -268,41 +261,9 @@ public class Main {
 		}
 	}
 	
-//	private static Repository getRepository(Path repopath, boolean writable) {
-//		checkSHA3();
-////		try {
-////			return new FileRepository(repopath, writable);
-////		} catch (RepositoryException ex) {
-////			System.err.println("ERROR: could not open repository at " + repopath + ": " + ex.getReason());
-////			System.exit(255);
-////			return null; // never happens but keeps javac happy
-////		}
-//		if (writable) {
-//			return new PackfileWriter(Integer.MAX_VALUE);
-//		} else {
-//			try {
-//				return new PackfileReader(repopath);
-//			} catch (IOException ex) {
-//				System.err.println("ERROR: could not open repository at " + repopath);
-//				System.exit(255);
-//				return null;
-//			}
-//		}
-//	}
-	
 	private static PackfileReader getReader(Path repopath) {
 		try {
 			return new PackfileReader(repopath);
-		} catch (IOException ex) {
-			System.err.println("ERROR: could not open repository at " + repopath);
-			System.exit(255);
-			return null;
-		}
-	}
-	
-	private static PackfileWriter getWriter(Path repopath) {
-		try {
-			return new PackfileWriter(repopath);
 		} catch (IOException ex) {
 			System.err.println("ERROR: could not open repository at " + repopath);
 			System.exit(255);
