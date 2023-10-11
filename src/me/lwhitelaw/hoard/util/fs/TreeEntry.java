@@ -7,10 +7,15 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.DosFileAttributeView;
 import java.nio.file.attribute.DosFileAttributes;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoField;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +37,7 @@ public final class TreeEntry {
 	
 	private final String name; // limited to 2^16-1 bytes in UTF-8 though I doubt anyone really is crazy enough to do this
 	private final int descBits; // bits describing attributes of this tree entry, type, permissions, etc.
-	private final long fileSize; // zero for directories, Long.MAX_VALUE if size unknown or file way too long
+	private final long fileSize; // size of file in bytes, Long.MAX_VALUE if size unknown or file way too long. For directories, size of all files within.
 	private final long mtime; // last modified time of file/folder/any file in folder, in seconds
 	/*
 	 * RE: mtime
@@ -56,7 +61,7 @@ public final class TreeEntry {
 		this.descBits = bits;
 		this.fileSize = fileSize;
 		this.mtime = mtime;
-		this.refHash = Arrays.copyOf(hash, hash.length);
+		this.refHash = hash == null? null : Arrays.copyOf(hash, hash.length);
 	}
 	
 	public TreeEntry withHash(byte[] newHash) {
@@ -93,50 +98,46 @@ public final class TreeEntry {
 		
 		boolean haveAttrs = false;
 		// try getting Unix/POSIX attributes if we do not have attributes already
-		if (!haveAttrs) {
-			try {
-				PosixFileAttributeView aview = Files.getFileAttributeView(path, PosixFileAttributeView.class);
-				PosixFileAttributes attrib = aview.readAttributes();
-				// Set the mtime
-				mtime = Math.max(attrib.creationTime().to(TimeUnit.SECONDS),attrib.lastModifiedTime().to(TimeUnit.SECONDS));
-				// Get the permission bits and set those
-				Set<PosixFilePermission> permbits = attrib.permissions();
-				if (permbits.contains(PosixFilePermission.OWNER_READ)) descBits |= BIT_USER_READ;
-				if (permbits.contains(PosixFilePermission.OWNER_WRITE)) descBits |= BIT_USER_WRITE;
-				if (permbits.contains(PosixFilePermission.OWNER_EXECUTE)) descBits |= BIT_USER_EXECUTE;
-				if (permbits.contains(PosixFilePermission.GROUP_READ)) descBits |= BIT_GROUP_READ;
-				if (permbits.contains(PosixFilePermission.GROUP_WRITE)) descBits |= BIT_GROUP_WRITE;
-				if (permbits.contains(PosixFilePermission.GROUP_EXECUTE)) descBits |= BIT_GROUP_EXECUTE;
-				if (permbits.contains(PosixFilePermission.OTHERS_READ)) descBits |= BIT_OTHER_READ;
-				if (permbits.contains(PosixFilePermission.OTHERS_WRITE)) descBits |= BIT_OTHER_WRITE;
-				if (permbits.contains(PosixFilePermission.OTHERS_EXECUTE)) descBits |= BIT_OTHER_EXECUTE;
-				haveAttrs = true;
-			} catch (UnsupportedOperationException ex) {
-				// try something else
-			}
+		unix: if (!haveAttrs) {
+			PosixFileAttributeView aview = Files.getFileAttributeView(path, PosixFileAttributeView.class);
+			if (aview == null) break unix; // not supported
+			PosixFileAttributes attrib = aview.readAttributes();
+			// Set the mtime
+			mtime = Math.max(attrib.creationTime().to(TimeUnit.SECONDS),attrib.lastModifiedTime().to(TimeUnit.SECONDS));
+			// Get the permission bits and set those
+			Set<PosixFilePermission> permbits = attrib.permissions();
+			if (permbits.contains(PosixFilePermission.OWNER_READ)) descBits |= BIT_USER_READ;
+			if (permbits.contains(PosixFilePermission.OWNER_WRITE)) descBits |= BIT_USER_WRITE;
+			if (permbits.contains(PosixFilePermission.OWNER_EXECUTE)) descBits |= BIT_USER_EXECUTE;
+			if (permbits.contains(PosixFilePermission.GROUP_READ)) descBits |= BIT_GROUP_READ;
+			if (permbits.contains(PosixFilePermission.GROUP_WRITE)) descBits |= BIT_GROUP_WRITE;
+			if (permbits.contains(PosixFilePermission.GROUP_EXECUTE)) descBits |= BIT_GROUP_EXECUTE;
+			if (permbits.contains(PosixFilePermission.OTHERS_READ)) descBits |= BIT_OTHER_READ;
+			if (permbits.contains(PosixFilePermission.OTHERS_WRITE)) descBits |= BIT_OTHER_WRITE;
+			if (permbits.contains(PosixFilePermission.OTHERS_EXECUTE)) descBits |= BIT_OTHER_EXECUTE;
+			haveAttrs = true;
 		}
 		// Try getting DOS attributes if the above failed
-		if (!haveAttrs) {
-			try {
-				DosFileAttributes attrib = Files.readAttributes(path, DosFileAttributes.class);
-				// Set the mtime
-				mtime = Math.max(attrib.creationTime().to(TimeUnit.SECONDS),attrib.lastModifiedTime().to(TimeUnit.SECONDS));
-				// Check if the file is read-only in order to set R/W bits for user.
-				if (attrib.isReadOnly()) {
-					descBits |= BIT_USER_READ;
-				} else {
-					descBits |= BIT_USER_READ | BIT_USER_WRITE;
-				}
-				// Set the user X bit if the file heuristically might be executable
-				// TODO: write that
-				haveAttrs = true;
-			} catch (UnsupportedOperationException ex) {
-				// try something else
+		dos: if (!haveAttrs) {
+			DosFileAttributeView aview = Files.getFileAttributeView(path, DosFileAttributeView.class);
+			if (aview == null) break dos; // not supported
+			DosFileAttributes attrib = aview.readAttributes();
+			// Set the mtime
+			mtime = Math.max(attrib.creationTime().to(TimeUnit.SECONDS),attrib.lastModifiedTime().to(TimeUnit.SECONDS));
+			// Check if the file is read-only in order to set R/W bits for user.
+			if (attrib.isReadOnly()) {
+				descBits |= BIT_USER_READ;
+			} else {
+				descBits |= BIT_USER_READ | BIT_USER_WRITE;
 			}
+			// Set the user X bit if the file heuristically might be executable
+			// TODO: write that
+			haveAttrs = true;
 		}
 		// If all else fails... interrogate NIO directly
 		if (!haveAttrs) {
-			BasicFileAttributes attrib = Files.readAttributes(path, BasicFileAttributes.class);
+			BasicFileAttributeView aview = Files.getFileAttributeView(path, BasicFileAttributeView.class);
+			BasicFileAttributes attrib = aview.readAttributes();
 			// Set the mtime
 			mtime = Math.max(attrib.creationTime().to(TimeUnit.SECONDS),attrib.lastModifiedTime().to(TimeUnit.SECONDS));
 			if (Files.isReadable(path)) descBits |= BIT_USER_READ;
@@ -166,5 +167,37 @@ public final class TreeEntry {
 	
 	public byte[] getHash() {
 		return Arrays.copyOf(refHash,refHash.length);
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		// Bits
+		sb.append((descBits & BIT_DIRECTORY) != 0?     'D' : '-');
+		sb.append((descBits & BIT_USER_READ) != 0?     'R' : '-');
+		sb.append((descBits & BIT_USER_WRITE) != 0?    'W' : '-');
+		sb.append((descBits & BIT_USER_EXECUTE) != 0?  'X' : '-');
+		sb.append((descBits & BIT_GROUP_READ) != 0?    'R' : '-');
+		sb.append((descBits & BIT_GROUP_WRITE) != 0?   'W' : '-');
+		sb.append((descBits & BIT_GROUP_EXECUTE) != 0? 'X' : '-');
+		sb.append((descBits & BIT_OTHER_READ) != 0?    'R' : '-');
+		sb.append((descBits & BIT_OTHER_WRITE) != 0?   'W' : '-');
+		sb.append((descBits & BIT_OTHER_EXECUTE) != 0? 'X' : '-');
+		// Everything else
+		sb.append(String.format(" %20d %s   %s", fileSize, dateTimestampToString(mtime), name));
+		return sb.toString();
+	}
+	
+	public static String dateTimestampToString(long epoch) {
+		Instant instant = Instant.ofEpochSecond(epoch);
+		ZonedDateTime zdt = instant.atZone(ZoneOffset.UTC);
+		return String.format("%04d-%02d-%02d %02d:%02d:%02d",
+				zdt.getYear(),
+				zdt.getMonthValue(),
+				zdt.getDayOfMonth(),
+				zdt.getHour(),
+				zdt.getMinute(),
+				zdt.getSecond()
+		);
 	}
 }
