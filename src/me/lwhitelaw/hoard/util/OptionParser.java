@@ -4,7 +4,9 @@ import java.util.ArrayList;
 
 /**
  * A parser for command-line arguments vaguely similar to legacy getopt.
- *
+ * Supported switches are one-character only. If a switch accepts arguments, they are not optional.
+ * Valid forms for arguments for example switch <code>-a</code> are <code>-a arg</code> and <code>-aarg</code>.
+ * The switch <code>--</code> terminates switch parsing if present. Long-argument forms are not supported.
  */
 public class OptionParser {
 	/**
@@ -40,6 +42,11 @@ public class OptionParser {
 	 */
 	private final ArrayList<String> filteredArgv;
 	
+	/**
+	 * Set up an option parser with the given argument array and getopt declaration.
+	 * @param argv The unprocessed argument array (probably from main)
+	 * @param getoptDecl The getopt declaration, following the legacy C getopt specification.
+	 */
 	public OptionParser(String[] argv, String getoptDecl) {
 		this.argv = argv;
 		this.getoptDecl = getoptDecl;
@@ -49,6 +56,14 @@ public class OptionParser {
 		badopt = '\0';
 	}
 	
+	/**
+	 * Get the next switch character or report an error. If no more switches remain, -1 is returned.
+	 * If an unrecognised switch is passed, (int) '?' is returned. If a switch requires an argument and it
+	 * is missing, (int) ':' is returned. If the switch is '--', (int) '-' is returned.
+	 * <br>
+	 * If the switch character has an argument, that will be stored for retrieval by {link {@link #optarg()}.
+	 * @return a switch character or an error code.
+	 */
 	public int getopt() {
 		if (remaining == null) {
 			// No left-over remaining chars to handle.
@@ -108,14 +123,27 @@ public class OptionParser {
 		return optchar;
 	}
 	
+	/**
+	 * Return the switch argument for the last switch read. Returns null if no switch has been read yet or the last switch read
+	 * does not use arguments.
+	 * @return the switch argument, or null if not present
+	 */
 	public String optarg() {
 		return arg;
 	}
 	
+	/**
+	 * Returns the last switch argument character read that was not recognised, or '\0' if the last call to getopt succeeded.
+	 * @return the last unrecognised switch argument
+	 */
 	public char optopt() {
 		return badopt;
 	}
 	
+	/**
+	 * Return the arguments processed so far, without any switches or switch arguments.
+	 * @return the filtered argument array
+	 */
 	public String[] getArgv() {
 		return filteredArgv.toArray(new String[] {});
 	}
