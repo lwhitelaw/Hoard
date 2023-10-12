@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -136,7 +137,7 @@ public final class TreeEntry {
 				descBits |= BIT_USER_READ | BIT_USER_WRITE;
 			}
 			// Set the user X bit if the file heuristically might be executable
-			// TODO: write that
+			if (isHeuristicallyWindowsExecutable(name)) descBits |= BIT_USER_EXECUTE;
 			haveAttrs = true;
 		}
 		// If all else fails... interrogate NIO directly
@@ -204,5 +205,15 @@ public final class TreeEntry {
 				zdt.getMinute(),
 				zdt.getSecond()
 		);
+	}
+	
+	private static final String[] WINDOWS_EXECUTABLE_EXTENSIONS = {"exe","com","bat","msi"};
+	
+	public static boolean isHeuristicallyWindowsExecutable(String pathend) {
+		String lowercasedPath = pathend.toLowerCase(Locale.ROOT);
+		for (String ext : WINDOWS_EXECUTABLE_EXTENSIONS) {
+			if (lowercasedPath.endsWith(ext)) return true;
+		}
+		return false;
 	}
 }
