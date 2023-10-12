@@ -54,6 +54,11 @@ public final class TreeEntry {
 	public TreeEntry(String name, int bits, long fileSize, long mtime, byte[] hash) {
 		if (name == null) throw new NullPointerException("name is null");
 		if (!(name.length() > 0 && name.length() < 65536)) throw new IllegalArgumentException("name size is less than zero or over 65535: " + name.length());
+		// check the UTF-8
+		{
+			int utfLength = name.getBytes(StandardCharsets.UTF_8).length;
+			if (utfLength >= 65536) throw new IllegalArgumentException("name UTF-8 length would be over 65535: " + utfLength);
+		}
 		if (fileSize < 0) throw new IllegalArgumentException("file size cannot be negative");
 		if (fileSize > 0 && (bits & BIT_DIRECTORY) == BIT_DIRECTORY) throw new IllegalArgumentException("Directories must have file size of zero");
 		if (mtime < 0) throw new IllegalArgumentException("mtime may not be negative");
