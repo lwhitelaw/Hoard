@@ -13,17 +13,19 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import me.lwhitelaw.hoard.Hashes;
-import me.lwhitelaw.hoard.PackfileCollection;
 import me.lwhitelaw.hoard.PackfileReader;
 import me.lwhitelaw.hoard.PackfileWriter;
 import me.lwhitelaw.hoard.util.BigBlockInputStream;
 import me.lwhitelaw.hoard.util.BigBlockOutputStream;
+import me.lwhitelaw.hoard.util.Chunker;
+import me.lwhitelaw.hoard.util.Chunker2;
 import me.lwhitelaw.hoard.util.OptionParser;
-import me.lwhitelaw.hoard.util.SuperblockInputStream;
-import me.lwhitelaw.hoard.util.SuperblockOutputStream;
+import me.lwhitelaw.hoard.util.fs.TreeEntry;
 
 public class Main {
 	public static void main(String[] args) throws IOException {
+//		testTree();
+//		testChunker();
 		// call into test
 //		testArgParser();
 		// check arguments to switch on command
@@ -95,6 +97,42 @@ public class Main {
 		}
 		System.exit(0);
 	}
+	
+	private static void testChunker() {
+		try {
+			Chunker2 chunker = new Chunker2(10,12);
+			String filename = "E:\\Programs\\ZPAQ\\zpaq.cpp";
+			Path path = validatePath(filename); // where to source the block data
+			validateFile(path,false);
+			InputStream is = new BufferedInputStream(Files.newInputStream(path));
+			int numChars = 0;
+			int ch;
+			while ((ch = is.read()) != -1) {
+				numChars++;
+				chunker.update(ch);
+				if ((chunker.isMarker() && numChars >= 256) || numChars == 1048576) {
+					System.out.println(numChars);
+					chunker.reset();
+					numChars = 0;
+				}
+			}
+			is.close();
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
+		System.exit(0);
+	}
+	
+	private static void testTree() {
+		try {
+			String filename = "E:\\Programs\\ZPAQ\\zpaq.pod";
+			Path path = validatePath(filename); // where to source the block data
+			System.out.println(TreeEntry.fromPath(path));
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
+		System.exit(0);
+	}
 
 	private static void help() {
 		System.out.println("Hoard CAS file repository manager");
@@ -151,7 +189,7 @@ public class Main {
 			int exitcode = 0;
 			try {
 				// Open file input stream
-				InputStream stream = new BufferedInputStream(Files.newInputStream(blockpath), 65536);
+				InputStream stream = Files.newInputStream(blockpath);
 				BigBlockOutputStream sos = new BigBlockOutputStream(repo::writeBlock);
 				// Metrics
 				long startTime = System.currentTimeMillis();
@@ -160,11 +198,16 @@ public class Main {
 				long prevTransferred = 0;
 				long total = Files.size(blockpath);
 				
-				int c;
-				while ((c = stream.read()) != -1) {
-					sos.write(c);
-					transferred++;
-					if ((System.currentTimeMillis()-prevSample) >= 2000) {
+				int len;
+				byte[] b = new byte[65536];
+				while ((len = stream.read(b)) != -1) {
+					for (int i = 0; i < len; i++) {
+						sos.write(b[i]);
+						transferred++;
+					}
+//					sos.write(c);
+//					if (transferred-prevTransferred >= 16777216) {
+					if ((System.currentTimeMillis()-prevSample) >= 2000) { // this line is slow!
 						long now = System.currentTimeMillis();
 						System.out.println(StatusLine.formatTransferProgress(now, prevSample, startTime, transferred, prevTransferred, total, filename));
 						prevTransferred = transferred;
