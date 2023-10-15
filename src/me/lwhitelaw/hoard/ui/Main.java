@@ -18,7 +18,6 @@ import me.lwhitelaw.hoard.PackfileWriter;
 import me.lwhitelaw.hoard.util.BigBlockInputStream;
 import me.lwhitelaw.hoard.util.BigBlockOutputStream;
 import me.lwhitelaw.hoard.util.Chunker;
-import me.lwhitelaw.hoard.util.Chunker2;
 import me.lwhitelaw.hoard.util.OptionParser;
 import me.lwhitelaw.hoard.util.fs.TreeEntry;
 
@@ -246,7 +245,7 @@ public class Main {
 
 				int len;
 				byte[] b = new byte[65536];
-				while ((len = sis.read()) != -1) {
+				while ((len = sis.read(b)) != -1) {
 					for (int i = 0; i < len; i++) {
 						stream.write(b[i] & 0xFF);
 						transferred++;
