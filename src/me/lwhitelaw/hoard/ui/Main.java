@@ -25,9 +25,6 @@ import me.lwhitelaw.hoard.util.fs.TreeEntry;
 public class Main {
 	public static void main(String[] args) throws IOException {
 //		testTree();
-//		testChunker();
-		// call into test
-//		testArgParser();
 		// check arguments to switch on command
 		if (args.length < 1) {
 			help();
@@ -76,51 +73,6 @@ public class Main {
 				help();
 				break;
 		}
-	}
-	
-	private static void testArgParser() {
-		String[] argv = {"hello","-abci","world","-absworld","-s","seperate","-s","-i","--","-a"};
-		OptionParser parser = new OptionParser(argv, "ios:e:abc");
-		int opt;
-		while ((opt = parser.getopt()) != -1) {
-			if (opt == '?') {
-				System.out.println("Bad arg " + (char) parser.optopt());
-			}
-			if (opt == ':') {
-				System.out.println("option missing arg " + (char) parser.optopt());
-			}
-			System.out.println("Arg matched: " + (char) opt + " arg: " + parser.optarg());
-		}
-		System.out.println("Remaining argv: ");
-		for (String s : parser.getArgv()) {
-			System.out.println(s);
-		}
-		System.exit(0);
-	}
-	
-	private static void testChunker() {
-		try {
-			Chunker2 chunker = new Chunker2(10,12);
-			String filename = "E:\\Programs\\ZPAQ\\zpaq.cpp";
-			Path path = validatePath(filename); // where to source the block data
-			validateFile(path,false);
-			InputStream is = new BufferedInputStream(Files.newInputStream(path));
-			int numChars = 0;
-			int ch;
-			while ((ch = is.read()) != -1) {
-				numChars++;
-				chunker.update(ch);
-				if ((chunker.isMarker() && numChars >= 256) || numChars == 1048576) {
-					System.out.println(numChars);
-					chunker.reset();
-					numChars = 0;
-				}
-			}
-			is.close();
-		} catch (IOException ex) {
-			ex.printStackTrace();
-		}
-		System.exit(0);
 	}
 	
 	private static void testTree() {
@@ -205,8 +157,7 @@ public class Main {
 						sos.write(b[i]);
 						transferred++;
 					}
-//					sos.write(c);
-//					if (transferred-prevTransferred >= 16777216) {
+					
 					if ((System.currentTimeMillis()-prevSample) >= 2000) { // this line is slow!
 						long now = System.currentTimeMillis();
 						System.out.println(StatusLine.formatTransferProgress(now, prevSample, startTime, transferred, prevTransferred, total, filename));
