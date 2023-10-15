@@ -243,10 +243,15 @@ public class Main {
 				long transferred = 0;
 				long prevTransferred = 0;
 				
-				int c;
-				while ((c = sis.read()) != -1) {
-					stream.write(c & 0xFF);
-					transferred++;
+
+				int len;
+				byte[] b = new byte[65536];
+				while ((len = sis.read()) != -1) {
+					for (int i = 0; i < len; i++) {
+						stream.write(b[i] & 0xFF);
+						transferred++;
+					}
+					
 					if ((System.currentTimeMillis()-prevSample) >= 2000) {
 						long now = System.currentTimeMillis();
 						System.out.println(StatusLine.formatTransferSpeed(now, prevSample, startTime, transferred, prevTransferred, out));
