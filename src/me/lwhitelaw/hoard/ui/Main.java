@@ -246,10 +246,8 @@ public class Main {
 				int len;
 				byte[] b = new byte[65536];
 				while ((len = sis.read(b)) != -1) {
-					for (int i = 0; i < len; i++) {
-						stream.write(b[i] & 0xFF);
-						transferred++;
-					}
+					stream.write(b, 0, len);
+					transferred += len;
 					
 					if ((System.currentTimeMillis()-prevSample) >= 2000) {
 						long now = System.currentTimeMillis();

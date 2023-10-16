@@ -108,7 +108,7 @@ public final class Hashes {
 	 */
 	public static byte[] doHash(ByteBuffer input) {
 		MessageDigest sha3 = SHA3_256.get();
-		sha3.reset();
+//		sha3.reset(); // this is apparently not needed - digest() does this already
 		sha3.update(input);
 		return sha3.digest();
 	}

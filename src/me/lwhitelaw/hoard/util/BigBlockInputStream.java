@@ -51,12 +51,49 @@ public class BigBlockInputStream extends InputStream {
 
 	@Override
 	public int read() throws IOException {
+		if (!isBlockReady()) return -1; // get the next block set up if needed
+		// read a byte from current block
+		return currentBlock.get() & 0xFF;
+	}
+	
+	@Override
+	public int read(byte[] b, int off, int len) throws IOException {
+		if (len <= 0) return 0; // read nothing if there is nothing to read
+		if (!isBlockReady()) return -1; // get the next block set up; if we can't, declare end of stream
+		// Setup variables
+		int needed = len; // number of bytes we need to transfer
+		int copyPointer = off; // index into b where copy ops will happen
+		int transferred = 0; // number of bytes transferred
+		
+		// While b needs more data...
+		while (needed > 0) {
+			// Check again to make sure there is data, return if EOS is hit (only if a copy happened before)
+			if (!isBlockReady()) return transferred;
+			// Copy as much data as we can from the block
+			int remainingInBlock = currentBlock.remaining();
+			// If we need more data than this block has, copy only as much data as the block has
+			int amountToCopy = Math.min(needed, remainingInBlock);
+			debugCopy(b, copyPointer, amountToCopy);
+			copyPointer += amountToCopy;
+			transferred += amountToCopy;
+			needed -= amountToCopy;
+//			System.err.println("Copied " + amountToCopy);
+		}
+		// Return number of bytes transferred
+		return transferred;
+	}
+
+	private void debugCopy(byte[] b, int copyPointer, int amountToCopy) {
+		currentBlock.get(b, copyPointer, amountToCopy);
+	}
+	
+	private boolean isBlockReady() throws IOException {
 		while (currentBlock == null || !currentBlock.hasRemaining()) {
 			// Current block does not exist/is empty... fill it
 			if (!superblockData.hasRemaining()) {
 				// No more hashes in the superblock to read from
 				// End of stream
-				return -1;
+				return false;
 			}
 			// Read a hash and get the block
 			byte[] hash = new byte[HASH_SIZE];
@@ -66,8 +103,8 @@ public class BigBlockInputStream extends InputStream {
 			if (currentBlock == null) throw new IOException("Block for hash " + Hashes.hashToString(hash) + " is missing");
 			// if currentBlock is zero-size (shouldn't happen, but is legal format) loop again to try to get another block
 		}
-		// read a byte from current block
-		return currentBlock.get() & 0xFF;
+		// current block is ready to read from
+		return true;
 	}
 	
 	@Override
