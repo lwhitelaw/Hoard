@@ -73,7 +73,7 @@ public class BigBlockInputStream extends InputStream {
 			int remainingInBlock = currentBlock.remaining();
 			// If we need more data than this block has, copy only as much data as the block has
 			int amountToCopy = Math.min(needed, remainingInBlock);
-			debugCopy(b, copyPointer, amountToCopy);
+			currentBlock.get(b, copyPointer, amountToCopy);
 			copyPointer += amountToCopy;
 			transferred += amountToCopy;
 			needed -= amountToCopy;
@@ -81,10 +81,6 @@ public class BigBlockInputStream extends InputStream {
 		}
 		// Return number of bytes transferred
 		return transferred;
-	}
-
-	private void debugCopy(byte[] b, int copyPointer, int amountToCopy) {
-		currentBlock.get(b, copyPointer, amountToCopy);
 	}
 	
 	private boolean isBlockReady() throws IOException {
