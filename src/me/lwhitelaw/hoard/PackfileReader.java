@@ -24,6 +24,11 @@ public class PackfileReader {
 	private final long blocktableLength;
 	private final long dataAreaStart;
 	
+	private static final int CACHE_SIZE = (1 << 16);
+	private static final int CACHE_MASK = CACHE_SIZE - 1;
+	private static record CacheEntry(long index, PackfileEntry value) {}
+	private final ThreadLocal<CacheEntry[]> cache;
+	
 	/**
 	 * Open a Hoard packfile at the provided path.
 	 * @param filePath The path to the packfile to open
@@ -47,6 +52,9 @@ public class PackfileReader {
 			dataAreaStart = hbuf.getLong(HEADER_OFFS_DATA_AREA_START);
 			if (dataAreaStart < 0) throw new IOException("Data area start is invalid: " + dataAreaStart);
 		}
+		// Init cache
+		cache = new ThreadLocal<CacheEntry[]>();
+		cache.set(new CacheEntry[CACHE_SIZE]);
 	}
 	
 	/**
@@ -105,6 +113,12 @@ public class PackfileReader {
 	 * @throws IOException if there are problems reading the file or if the entry is malformed
 	 */
 	public PackfileEntry getBlocktableEntry(long index) throws IOException {
+		// Check cache
+		{
+			CacheEntry cachedCandidate = cache.get()[(int)(index & CACHE_MASK)];
+			if (cachedCandidate != null && cachedCandidate.index == index) return cachedCandidate.value;
+		}
+		// else, read it normally
 		ByteBuffer ebuf = ByteBuffer.allocate(ENTRY_SIZE).order(ByteOrder.BIG_ENDIAN);
 		long filePosition = (long)ENTRY_SIZE * (long)index + Format.OFFS_BLOCKTABLE_START;
 		Buffers.readFileFully(file, ebuf, filePosition);
@@ -114,7 +128,11 @@ public class PackfileReader {
 		// PackfileEntry will do its own checks
 		try {
 			ebuf.flip();
-			return PackfileEntry.fromBuffer(ebuf);
+			PackfileEntry entry = PackfileEntry.fromBuffer(ebuf);
+			// valid, write into cache
+			cache.get()[(int)(index & CACHE_MASK)] = new CacheEntry(index, entry);
+			// return value
+			return entry;
 		} catch (IllegalArgumentException ex) {
 			throw new IOException(ex.getMessage());
 		}
