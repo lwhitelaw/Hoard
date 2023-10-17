@@ -39,14 +39,18 @@ public class BigBlockInputStream extends InputStream {
 	}
 
 	private void verifySuperblock() throws IOException {
-		// Verify block is large enough to even have the header
-		if (superblockData.remaining() < HEADER_SIZE) throw new IOException("Superblock too small");
-		// Verify the header magic number is there
-		if (superblockData.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) throw new IOException("Block lacks magic value SUPERBLK");
-		// Verify the block count is not negative
-		if (superblockData.getInt(HEADER_OFFS_NUM_BLOCKS) < 0) throw new IOException("Corrupted block count");
-		// Verify the amount of data matches the expected size of the superblock
-		if (superblockData.remaining() != (HEADER_SIZE + superblockData.getInt(HEADER_OFFS_NUM_BLOCKS) * HASH_SIZE)) throw new IOException("The superblock is not the expected size");
+		Checks.checkSufficientSize(superblockData.remaining(), HEADER_SIZE, "header");
+		Checks.checkExpectedValue(superblockData.getLong(HEADER_OFFS_MAGIC), HEADER_MAGIC, "magic");
+		Checks.checkPositive(superblockData.getInt(HEADER_OFFS_NUM_BLOCKS), "num blocks");
+		Checks.checkExpectedValue(superblockData.remaining(), HEADER_SIZE + superblockData.getInt(HEADER_OFFS_NUM_BLOCKS) * HASH_SIZE, "superblock size");
+//		// Verify block is large enough to even have the header
+//		if (superblockData.remaining() < HEADER_SIZE) throw new IOException("Superblock too small");
+//		// Verify the header magic number is there
+//		if (superblockData.getLong(HEADER_OFFS_MAGIC) != HEADER_MAGIC) throw new IOException("Block lacks magic value SUPERBLK");
+//		// Verify the block count is not negative
+//		if (superblockData.getInt(HEADER_OFFS_NUM_BLOCKS) < 0) throw new IOException("Corrupted block count");
+//		// Verify the amount of data matches the expected size of the superblock
+//		if (superblockData.remaining() != (HEADER_SIZE + superblockData.getInt(HEADER_OFFS_NUM_BLOCKS) * HASH_SIZE)) throw new IOException("The superblock is not the expected size");
 	}
 
 	@Override

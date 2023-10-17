@@ -1,6 +1,8 @@
 package me.lwhitelaw.hoard.util.fs;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -21,10 +23,15 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import me.lwhitelaw.hoard.Hashes;
+import me.lwhitelaw.hoard.util.Buffers;
+import me.lwhitelaw.hoard.util.Checks;
+
 public final class TreeEntry {
-	public static final int BIT_VALID_MASK =    0x03FF;
+	public static final int BIT_VALID_MASK =    0x0FFF;
 	// Types
-	public static final int BIT_DIRECTORY =     0x0200; // otherwise it is a file
+	public static final int BIT_VIRTUAL =       0x0400; // if set, the item isn't meant to be a real filesystem object
+	public static final int BIT_DIRECTORY =     0x0200; // if set, is directory, otherwise it is a file
 	// Unix-style permissions, emulated on other platforms
 	public static final int BIT_USER_READ =     0x0100;
 	public static final int BIT_USER_WRITE =    0x0080;
@@ -36,10 +43,10 @@ public final class TreeEntry {
 	public static final int BIT_OTHER_WRITE =   0x0002;
 	public static final int BIT_OTHER_EXECUTE = 0x0001;
 	
-	private final String name; // limited to 2^16-1 bytes in UTF-8 though I doubt anyone really is crazy enough to do this
 	private final int descBits; // bits describing attributes of this tree entry, type, permissions, etc.
 	private final long fileSize; // size of file in bytes, Long.MAX_VALUE if size unknown or file way too long. For directories, size of all files within.
 	private final long mtime; // last modified time of file/folder/any file in folder, in seconds
+	private final String name; // limited to 2^16-1 bytes in UTF-8 though I doubt anyone really is crazy enough to do this
 	/*
 	 * RE: mtime
 	 * Hoard's concept of mtime is different from the filesystem.
@@ -72,6 +79,10 @@ public final class TreeEntry {
 	
 	public TreeEntry withHash(byte[] newHash) {
 		return new TreeEntry(name, descBits, fileSize, mtime, newHash);
+	}
+	
+	public TreeEntry withSize(long newSize) {
+		return new TreeEntry(name, descBits, newSize, mtime, refHash);
 	}
 	
 	public static TreeEntry fromPath(Path path) throws IOException {
@@ -179,6 +190,7 @@ public final class TreeEntry {
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		// Bits
+		sb.append((descBits & BIT_VIRTUAL) != 0?       'V' : '-');
 		sb.append((descBits & BIT_DIRECTORY) != 0?     'D' : '-');
 		sb.append((descBits & BIT_USER_READ) != 0?     'R' : '-');
 		sb.append((descBits & BIT_USER_WRITE) != 0?    'W' : '-');
@@ -215,5 +227,25 @@ public final class TreeEntry {
 			if (lowercasedPath.endsWith(ext)) return true;
 		}
 		return false;
+	}
+	
+	public void write(ByteBuffer buf) {
+		buf.order(ByteOrder.BIG_ENDIAN);
+		buf.putShort((short) descBits);
+		buf.putLong(fileSize);
+		buf.putLong(mtime);
+		buf.put(refHash);
+		Buffers.putShortString(buf, name);
+	}
+	
+	public static TreeEntry read(ByteBuffer buf) throws IOException {
+		buf.order(ByteOrder.BIG_ENDIAN);
+		int descBits = buf.getShort() & BIT_VALID_MASK;
+		long fileSize = Checks.checkPositive(buf.getLong(),"file size");
+		long mtime = Checks.checkPositive(buf.getLong(),"mtime");
+		byte[] refHash = new byte[Hashes.HASH_SIZE];
+		buf.get(refHash);
+		String name = Buffers.getShortString(buf);
+		return new TreeEntry(name, descBits, fileSize, mtime, refHash);
 	}
 }

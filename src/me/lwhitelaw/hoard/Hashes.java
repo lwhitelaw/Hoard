@@ -101,6 +101,8 @@ public final class Hashes {
 		}
 	});
 	
+	
+	public static final int HASH_SIZE = 32;
 	/**
 	 * Hash the input with SHA3-256, consuming the remaining data.
 	 * @param input The input to hash

@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 
 public class Buffers {
 	/**
@@ -112,5 +113,19 @@ public class Buffers {
 			bytes += readResult;
 		}
 		return bytes;
+	}
+	
+	public static void putShortString(ByteBuffer buf, String str) {
+		byte[] chars = str.getBytes(StandardCharsets.UTF_8);
+		if (chars.length > 65535) throw new IllegalArgumentException("string size >65535 bytes");
+		buf.putShort((short) chars.length);
+		buf.put(chars);
+	}
+	
+	public static String getShortString(ByteBuffer buf) {
+		int len = buf.getShort() & 0xFFFF;
+		byte[] chars = new byte[len];
+		buf.get(chars);
+		return new String(chars,StandardCharsets.UTF_8);
 	}
 }
