@@ -12,6 +12,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.List;
+
 import me.lwhitelaw.hoard.Hashes;
 import me.lwhitelaw.hoard.PackfileReader;
 import me.lwhitelaw.hoard.PackfileWriter;
@@ -19,11 +21,12 @@ import me.lwhitelaw.hoard.util.BigBlockInputStream;
 import me.lwhitelaw.hoard.util.BigBlockOutputStream;
 import me.lwhitelaw.hoard.util.Chunker;
 import me.lwhitelaw.hoard.util.OptionParser;
+import me.lwhitelaw.hoard.util.fs.Tree;
 import me.lwhitelaw.hoard.util.fs.TreeEntry;
 
 public class Main {
 	public static void main(String[] args) throws IOException {
-//		testTree();
+		testTree();
 		// check arguments to switch on command
 		if (args.length < 1) {
 			help();
@@ -76,9 +79,12 @@ public class Main {
 	
 	private static void testTree() {
 		try {
-			String filename = "E:\\Programs\\ZPAQ\\zpaq.pod";
+			String filename = "E:\\Programs\\";
 			Path path = validatePath(filename); // where to source the block data
-			System.out.println(TreeEntry.fromPath(path));
+			List<TreeEntry> entries = Tree.fromDirectoryPath(path).getListView();
+			for (TreeEntry e : entries) {
+				System.out.println(e);
+			}
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}
