@@ -78,4 +78,8 @@ public class BigBlockOutputStream extends OutputStream {
 	public byte[] getHash() {
 		return finalHash;
 	}
+	
+	public int getNumChunks() {
+		return hashList.size();
+	}
 }

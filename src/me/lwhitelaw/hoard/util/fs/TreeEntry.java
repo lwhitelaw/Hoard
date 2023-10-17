@@ -246,6 +246,7 @@ public final class TreeEntry {
 		byte[] refHash = new byte[Hashes.HASH_SIZE];
 		buf.get(refHash);
 		String name = Buffers.getShortString(buf);
+		Checks.checkSufficientSize(name.length(), 1, "name");
 		return new TreeEntry(name, descBits, fileSize, mtime, refHash);
 	}
 }
