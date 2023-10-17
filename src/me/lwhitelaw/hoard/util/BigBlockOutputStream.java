@@ -8,10 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BigBlockOutputStream extends OutputStream {
-	public interface Output {
-		byte[] writeBlock(ByteBuffer input);
-	}
-	
 	// Header
 	private static final int HEADER_SIZE = 12;
 	// Offsets
@@ -23,13 +19,13 @@ public class BigBlockOutputStream extends OutputStream {
 	private static final int MAX_CHUNK_LIMIT = 67108863; // Maximum number of chunks. Calculated as (2^31-16) / 32 bytes and rounded down.
 	private static final int HASH_SIZE = 32; // 256-bit hashes use 32 bytes.
 	
-	private Output writeInterface;
+	private BlockOutput writeInterface;
 	private byte[] finalHash; // null if not yet written out, final block hash
 	private ByteBuffer currentBlock = ByteBuffer.allocate(65536).order(ByteOrder.BIG_ENDIAN); // block where bytes go in current chunk
 	private Chunker chunker = new Chunker(10,12); // sum of last 1024 bytes, try to cut at 4K bytes
 	private List<byte[]> hashList = new ArrayList<byte[]>(); // list of all chunk hashes so far
 	
-	public BigBlockOutputStream(Output out) {
+	public BigBlockOutputStream(BlockOutput out) {
 		writeInterface = out;
 	}
 	

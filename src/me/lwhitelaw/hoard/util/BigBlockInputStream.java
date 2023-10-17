@@ -8,13 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import me.lwhitelaw.hoard.Hashes;
-import me.lwhitelaw.hoard.util.BigBlockOutputStream.Output;
 
 public class BigBlockInputStream extends InputStream {
-	public interface Input {
-		ByteBuffer readBlock(byte[] hash) throws IOException;
-	}
-	
 	// Header
 	private static final int HEADER_SIZE = 12;
 	// Offsets
@@ -25,11 +20,11 @@ public class BigBlockInputStream extends InputStream {
 	private static final long HEADER_MAGIC = 0x5355504552424C4BL; // "SUPERBLK", magic for all superblocks
 	private static final int HASH_SIZE = 32; // 256-bit hashes use 32 bytes.
 
-	private Input readInterface;
+	private BlockInput readInterface;
 	private ByteBuffer superblockData;
 	private ByteBuffer currentBlock;
 	
-	public BigBlockInputStream(Input in, byte[] hash) throws IOException {
+	public BigBlockInputStream(BlockInput in, byte[] hash) throws IOException {
 		readInterface = in;
 		// read in superblock and verify
 		superblockData = readInterface.readBlock(hash);
