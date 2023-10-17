@@ -1,6 +1,8 @@
 package me.lwhitelaw.hoard.util.fs;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A serialisable form of directory tree data.
@@ -28,5 +30,18 @@ public final class Tree {
 		}
 		// Add to end if everything else is smaller
 		entries.add(entry);
+	}
+	
+	public void removeEntry(String name) {
+		for (int i = 0; i < entries.size(); i++) {
+			if (entries.get(i).getName().equals(name)) {
+				entries.remove(i);
+				return;
+			}
+		}
+	}
+	
+	public List<TreeEntry> getListView() {
+		return Collections.unmodifiableList(entries);
 	}
 }
